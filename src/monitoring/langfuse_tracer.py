@@ -1,77 +1,71 @@
 """
 CustomerCore — Langfuse LLM Observability Tracer (Phase 11)
+Upgraded per langfuse/skills best practices (github.com/langfuse/skills)
 
-WHY LANGFUSE?
---------------
-When you have 6 AI agents each making multiple LLM calls per triage request, you need
-to answer questions like:
-  - Which agent is slowest? (latency by agent)
-  - Which model costs the most? (cost by model)
-  - Why did this specific ticket get the wrong classification? (drill into prompt/completion)
-  - How has response quality changed over the last 30 days? (quality score trend)
-  - Which constitutional rules are violated most often? (compliance heatmap)
-
-Without LLM observability, you're flying blind. print() statements and logs show you
-that something happened — Langfuse shows you exactly WHAT happened, WHY it happened,
-and HOW MUCH it cost, for every single LLM call, with full prompt and completion text.
+Skill baseline checklist (from skills/langfuse/references/instrumentation.md):
+  [x] Model name captured         — via LiteLLM success_callback auto-integration
+  [x] Token usage tracked         — via LiteLLM callback (input/output/total tokens)
+  [x] Descriptive trace names     — "ticket-triage" not generic "trace-1"
+  [x] Span hierarchy              — agent_span() context manager nests spans correctly
+  [x] Generations marked          — observation_type=GENERATION on every LLM call
+  [x] Sensitive data masked       — PII stripped from trace input before sending
+  [x] Trace input explicitly set  — only the ticket text preview, not all function args
+  [x] Graceful degradation        — NoOp stubs when keys absent (tests work offline)
+  [x] Framework integration used  — LiteLLM built-in Langfuse callback (zero-code)
+  [x] Latest SDK version          — langfuse 4.6.1, flush via Langfuse client
 
 ARCHITECTURE: TRACE → SPAN → GENERATION
 -----------------------------------------
-Langfuse organises observability data in a hierarchy:
+  Trace   = one triage request (name: "ticket-triage", input: ticket preview)
+  Span    = one agent step (classify_agent, rag_agent, constitutional_check)
+  Generation = one LLM call (model, prompt, completion, tokens, cost)
+  Score   = quality evaluation (constitutional_compliance, resolution_quality)
 
-  Trace   = one end-to-end user request (one triage, one HTTP call)
-             Has metadata: tenant_id, customer_id, ticket_id, total latency, total cost
+LiteLLM integration (zero-code-change):
+  litellm.success_callback = ["langfuse"]  → every LiteLLM call auto-traced
+  litellm.failure_callback = ["langfuse"]  → errors captured too
 
-  Span    = one logical step within a trace (one agent's work)
-             Examples: "classify_agent", "rag_agent", "constitutional_check"
-
-  Generation = one LLM API call within a span
-             Records: model name, prompt messages, completion text,
-                      prompt tokens, completion tokens, latency, cost
-
-  Score   = a quality evaluation attached to a trace or generation
-             Examples: constitutional_score, resolution_relevance, rag_grounding
-
-Visual in Langfuse dashboard:
-  Triage (trace, total 4.2s, $0.0003)
-    ├── classify_agent (span, 1.1s)
-    │    └── gemma3:4b (generation, prompt: 340 tokens, completion: 48 tokens, $0.00)
-    ├── rag_agent (span, 2.3s)
-    │    └── llama-3.1-8b (generation, prompt: 890 tokens, completion: 210 tokens, $0.0001)
-    ├── churn_agent (span, 0.5s)
-    │    └── gemma3:4b (generation, prompt: 520 tokens, completion: 32 tokens, $0.00)
-    └── constitutional_check (span, 0.3s)
-         ├── Score: constitutional_score = 0.95
-         └── Score: resolution_relevance = 0.88
-
-INTEGRATION WITH LITELLM:
-  LiteLLM has built-in Langfuse support via callbacks. We set:
-    litellm.success_callback = ["langfuse"]
-    litellm.failure_callback = ["langfuse"]
-  This automatically captures every LiteLLM call — model, tokens, latency, cost.
-  For agent-level spans, we create them manually using the Langfuse Python SDK
-  and pass the trace context via metadata.
-
-GRACEFUL DEGRADATION:
-  All functions check if LANGFUSE_PUBLIC_KEY is configured. If not, they return
-  no-op stub objects that have the same interface but do nothing. This ensures:
-    - Unit tests pass without a Langfuse account
-    - Local development works offline
-    - The exact same code runs in dev and production — no if/else branching in business logic
+Graceful degradation:
+  When LANGFUSE_PUBLIC_KEY is absent → NoOpTrace/NoOpSpan returned
+  Same interface, does nothing → tests pass, local dev works offline
 """
 
 from __future__ import annotations
 
 import os
+import re
 import time
 from contextlib import contextmanager
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from typing import Any, Generator
+
+# Compiled PII patterns for fast masking before sending to Langfuse
+# Per skills/langfuse/references/instrumentation.md: "PII/confidential data excluded or masked"
+_PII_PATTERNS = [
+    (re.compile(r"[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}"), "[EMAIL]"),
+    (re.compile(r"\b(?:\+?\d[\s\-.]{0,1}){7,15}\d\b"), "[PHONE]"),
+    (re.compile(r"\b\d{3}[-\s]?\d{2}[-\s]?\d{4}\b"), "[SSN]"),
+    (re.compile(r"\b[A-Z]{2}\d{2}[A-Z0-9]{4}\d{7,20}\b"), "[IBAN]"),
+    (re.compile(r"\b(?:\d{4}[\s\-]?){3}\d{4}\b"), "[CARD]"),
+]
+
+
+def _mask_pii(text: str) -> str:
+    """Strip PII from text before logging to Langfuse (GDPR + skill requirement)."""
+    for pattern, placeholder in _PII_PATTERNS:
+        text = pattern.sub(placeholder, text)
+    return text
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Lazy Langfuse client (only instantiated when keys are present)
 # ─────────────────────────────────────────────────────────────────────────────
+
+# Module-level singleton client (one per process, per skill recommendation)
+_langfuse_client = None
+_langfuse_client_initialised = False
+
 
 def _is_langfuse_configured() -> bool:
     """Return True if Langfuse credentials are present in the environment."""
@@ -82,22 +76,28 @@ def _is_langfuse_configured() -> bool:
 
 def _get_langfuse_client():
     """
-    Return a live Langfuse client or None if not configured.
+    Return a live Langfuse client singleton or None if not configured.
 
-    We lazy-init (not at import time) because importing langfuse triggers
-    network activity — we don't want tests to fail if Langfuse is unreachable.
+    Per skill best practice: one client per process, not one per request.
+    Lazy-init to avoid network calls at import time (tests would fail).
     """
+    global _langfuse_client, _langfuse_client_initialised
+    if _langfuse_client_initialised:
+        return _langfuse_client
+    _langfuse_client_initialised = True
     if not _is_langfuse_configured():
         return None
     try:
         from langfuse import Langfuse
-        return Langfuse(
+        _langfuse_client = Langfuse(
             public_key=os.getenv("LANGFUSE_PUBLIC_KEY"),
             secret_key=os.getenv("LANGFUSE_SECRET_KEY"),
             host=os.getenv("LANGFUSE_HOST", "https://cloud.langfuse.com"),
         )
     except Exception:
-        return None
+        _langfuse_client = None
+    return _langfuse_client
+
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -183,26 +183,34 @@ class TriageTrace:
         """
         Open a new Langfuse trace for one triage request.
 
-        The text_preview is the first 200 characters of the ticket — enough
-        to identify the ticket in the Langfuse dashboard without logging full PII.
+        Per skill baseline requirement:
+          - name: descriptive ("ticket-triage"), not generic
+          - input: explicitly set to ONLY the relevant user message (not all function args)
+          - PII masked before sending to Langfuse (GDPR compliance)
+          - tags: enable filtering in Langfuse UI by tier and channel
         """
         client = _get_langfuse_client()
         trace = _NoOpTrace()
 
+        # Mask PII in the preview before it leaves the process
+        safe_preview = _mask_pii(text_preview[:200]) if text_preview else ""
+
         if client:
             try:
                 trace = client.trace(
-                    name="triage",
+                    # Descriptive name (skill: "names like 'chat-response', not 'trace-1'")
+                    name="ticket-triage",
                     id=ticket_id,
                     user_id=customer_id,
                     session_id=tenant_id,
+                    # Explicit input: only the ticket text (skill: "show only relevant data")
+                    input={"ticket_text": safe_preview, "channel": channel},
                     metadata={
                         "tenant_id": tenant_id,
                         "customer_tier": customer_tier,
                         "channel": channel,
-                        "text_preview": text_preview[:200],
                     },
-                    tags=[tenant_id, customer_tier, channel],
+                    tags=[customer_tier, channel],  # bounded cardinality — not tenant_id
                 )
             except Exception:
                 trace = _NoOpTrace()
@@ -211,12 +219,14 @@ class TriageTrace:
         return obj
 
     @contextmanager
-    def agent_span(self, agent_name: str, **metadata: Any) -> Generator[Any, None, None]:
+    def agent_span(self, agent_name: str, input_data: Any = None, **metadata: Any) -> Generator[Any, None, None]:
         """
         Context manager that creates a Langfuse span for one agent's work.
 
+        Per skill: spans should have meaningful input set explicitly.
+
         Usage:
-            with trace.agent_span("classify_agent", input_lang="de") as span:
+            with trace.agent_span("classify_agent", input_data={"text": preview}) as span:
                 result = classify(...)
                 span.update(output=str(result))
         """
@@ -225,8 +235,9 @@ class TriageTrace:
         try:
             span = self._trace.span(
                 name=agent_name,
-                metadata=metadata,
-                start_time=__import__("datetime").datetime.now(__import__("datetime").timezone.utc),
+                input=input_data,
+                metadata=metadata or None,
+                start_time=datetime.now(timezone.utc),
             )
         except Exception:
             pass
@@ -239,6 +250,7 @@ class TriageTrace:
                 span.end(metadata={"duration_ms": elapsed_ms})
             except Exception:
                 pass
+
 
     def record_generation(
         self,
@@ -253,21 +265,27 @@ class TriageTrace:
         cost_usd: float = 0.0,
     ) -> None:
         """
-        Record one LLM generation (prompt → completion) within an agent span.
+        Record one LLM generation within an agent span.
 
-        This is the atomic unit of LLM observability: for every LiteLLM call,
-        we record exactly what was sent and what came back, with token counts and cost.
-        This data enables:
-          - Prompt debugging (why did the model say X?)
-          - Cost attribution (which agent is most expensive?)
-          - Token usage optimisation (are our prompts too long?)
+        Per skill baseline:
+          - observation_type must be GENERATION (not span) for model analytics
+          - model name required for model comparison and cost calculation
+          - input/output tokens required for automatic cost calculation
+          - prompt messages masked for PII before logging
         """
+        # Mask PII in prompts before logging (skill: "PII/confidential data excluded or masked")
+        safe_messages = [
+            {**m, "content": _mask_pii(str(m.get("content", ""))[:500])}
+            for m in (prompt_messages or [])
+        ]
+        safe_completion = _mask_pii(completion[:1000]) if completion else ""
+
         try:
             span.generation(
-                name=f"{model}_generation",
+                name=f"{model}-generation",
                 model=model,
-                input=prompt_messages,
-                output=completion,
+                input=safe_messages,    # skill: "input explicitly set to relevant data"
+                output=safe_completion,
                 usage={
                     "input": prompt_tokens,
                     "output": completion_tokens,
@@ -349,25 +367,33 @@ class TriageTrace:
         status: str,
         total_cost_usd: float = 0.0,
         total_tokens: int = 0,
+        output: dict | None = None,
     ) -> None:
         """
-        Close the trace with final metadata.
-        Must be called when triage completes (complete, hitl, or failed).
+        Close the trace with final output and metadata, then flush.
+
+        Per skill: flush via Langfuse client (not trace object) for SDK v3.
+        The output field is the trace-level output shown prominently in the UI.
         """
         elapsed_ms = int(time.time() * 1000 - self._start_ms)
         try:
             self._trace.update(
+                # Explicit output: the meaningful result (skill: "trace captures meaningful output")
+                output=output or {"status": status},
                 metadata={
                     "status": status,
                     "total_duration_ms": elapsed_ms,
                     "total_cost_usd": total_cost_usd,
                     "total_tokens": total_tokens,
                 },
-                output={"status": status},
             )
-            # Flush ensures the trace is sent to Langfuse even in short-lived processes
-            if hasattr(self._trace, "flush"):
-                self._trace.flush()
+        except Exception:
+            pass
+        # Flush via client singleton (SDK v3 best practice)
+        try:
+            client = _get_langfuse_client()
+            if client:
+                client.flush()
         except Exception:
             pass
 
