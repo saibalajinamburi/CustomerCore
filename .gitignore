@@ -1,4 +1,4 @@
-﻿.venv/
+.venv/
 __pycache__/
 *.pyc
 *.pyo
@@ -47,3 +47,7 @@ Thumbs.db
 htmlcov/
 .coverage
 coverage.xml
+
+# Personal study docs — local only, not for GitHub
+BUILD_GUIDE.md
+CustomerCore_Progress_Summary.md
