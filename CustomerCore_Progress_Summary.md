@@ -2630,6 +2630,7 @@ Q: What is structured output in LLMs and how does it improve reliability?
 | 7 | LLM Router | 16-entry routing table, 54% local, LiteLLM gateway |
 | 8 | Multi-Language + Graph-RAG | 7 langs, 87k rows, NetworkX graph, 218 tests |
 | 9 | LangGraph Multi-Agent Supervisor | 6 agents, 14-field Pydantic schema, MemorySaver, 223 tests |
+| 10 | FastAPI REST API + Dockerfile | 9 routes, JWT auth, SSE streaming, Prometheus metrics, 20 tests |
 
 ---
 
@@ -2856,4 +2857,156 @@ Accounts needed LATER (at their respective phases):
   Hugging Face — Phase 18 (deployment, free 2 vCPU/16 GB Space)
   Upstash Redis — Phase 18 (cloud Redis for deployed version, free 10k commands/day)
   Cloudflare R2 — Phase 18 (cloud object storage, free 10 GB/month)
+
+
+
+---
+
+PHASE 10 COMPLETE: FastAPI REST API + Dockerfile + SSE Streaming
+
+Date: 2026-05-23
+Why: "A collection of powerful AI agents with no HTTP surface is just a set of scripts. Phase 10 turns CustomerCore into a deployable, callable, observable API product. Every enterprise integration, every frontend, every monitoring system, and every CI/CD pipeline needs an API endpoint to talk to."
+
+---
+
+PHASE 10a: FastAPI Application Layer
+
+Context: After 9 phases of building streaming pipelines, vector databases, privacy vaults, and multi-agent orchestration, there was still no way for any external system to interact with CustomerCore. The src/api/ directory was completely empty. Phase 10 builds the HTTP surface that exposes the entire platform to the world.
+
+Step 10.1 — API Models (src/api/models.py)
+  - Defined all public API request and response schemas using Pydantic V2.
+  - Separate from the internal AgentState / TriageOutput schemas because API models
+    are versioned and stable — breaking changes require a new API version (v2).
+    Internal schemas can evolve freely without breaking external API consumers.
+  - Key request model: TicketSubmitRequest (text, customer_id, customer_tier, channel, metadata).
+  - Key response models: TicketSubmitResponse (immediate 202), TriageResultResponse (full result).
+  - Enums: TicketPriority, CustomerTier, TriageStatus, TicketChannel — all typed and documented.
+
+Step 10.2 — JWT Authentication (src/api/auth.py)
+  - Implemented stateless JWT authentication using PyJWT.
+  - The tenant_id claim in every JWT is the data isolation key for all downstream queries.
+  - RBAC via require_role() dependency factory — managers can resume HITL, agents cannot.
+  - Dev token generator for local testing without a real auth service.
+
+Step 10.3 — Triage Router (src/api/routers/triage.py)
+  - POST /api/v1/triage — accepts ticket, returns 202 immediately, runs LangGraph in background.
+  - GET /api/v1/triage/{id} — polls for result with tenant isolation.
+  - POST /api/v1/triage/{id}/resume — HITL resume endpoint (manager/admin only).
+  - GET /api/v1/triage — lists recent tickets for the authenticated tenant.
+  - Tenant isolation: 404 (not 403) returned for cross-tenant access to prevent tenant enumeration.
+
+Step 10.4 — FastAPI App Factory (src/api/main.py)
+  - create_app() factory pattern — clean test isolation, future multi-variant support.
+  - Lifespan context manager for startup/shutdown (warms up LLM router).
+  - Middleware: CORS, security headers (X-Frame-Options, X-Content-Type-Options, HSTS),
+    request ID injection, structlog structured JSON logging.
+  - Per-tenant rate limiting via slowapi (100 triage submissions/minute per tenant).
+  - Global exception handler returns clean JSON errors, never raw Python tracebacks.
+
+Step 10.5 — SSE Streaming (src/api/routers/stream.py)
+  - GET /api/v1/triage/{id}/stream — Server-Sent Events endpoint for real-time triage progress.
+  - Async generator polls the triage store every 500ms and emits status events.
+  - Keep-alive comment every 10 seconds prevents proxy/load balancer timeouts.
+  - Closes automatically when triage reaches a terminal state (complete, hitl, failed).
+
+Step 10.6 — Prometheus Metrics (src/api/routers/metrics.py)
+  - GET /api/v1/metrics — Prometheus OpenMetrics format endpoint.
+  - Defines: triage_requests_total (counter), triage_duration_ms (histogram),
+    llm_calls_total (counter), llm_cost_usd_total (counter), sla_violations_total,
+    hitl_reviews_total, cache_hits_total.
+  - Helper functions record_triage_complete(), record_llm_call() etc. called by background tasks.
+
+Step 10.7 — Health Probes (src/api/routers/health.py)
+  - GET /api/v1/health — liveness probe (never checks external services, always 200 if alive).
+  - GET /api/v1/ready — readiness probe (checks Redis, ChromaDB, Supabase connectivity).
+  - Liveness returns 200 even if Redis is down. Readiness returns 503 if Redis is down.
+
+Step 10.8 — In-Memory Triage Store (src/api/store.py)
+  - TriageStore class acting as a development placeholder for the Phase 12 Supabase store.
+  - Same interface — swapping to Supabase in Phase 12 requires only changing the dependency injection.
+  - Tracks ticket lifecycle: PENDING → PROCESSING → COMPLETE/HITL/FAILED.
+
+Step 10.9 — Dockerfiles
+  - Dockerfile: Multi-stage build (builder stage installs deps, runtime stage copies packages only).
+    Non-root user, JDK for PySpark, HEALTHCHECK pointing to /api/v1/health.
+    ~60% smaller than a single-stage build because build tools (gcc, g++) are excluded from runtime.
+  - Dockerfile.hf: Lightweight for Hugging Face Spaces. No PySpark/JDK, port 7860, user ID 1000.
+
+Tests: 20 unit tests — 20 passing. All routes registered, auth validated, tenant isolation verified.
+
+---
+
+### PHASE 10 DEEP DIVE — FastAPI REST API Architecture
+
+**WHAT IS PHASE 10?**
+Phase 10 builds the HTTP API layer that exposes the entire CustomerCore intelligence stack to the outside world. Before Phase 10, all the AI agents, RAG engines, privacy vaults, and streaming pipelines were internal Python modules — there was no way for a frontend dashboard, a mobile app, a Slack bot, or a monitoring system to talk to CustomerCore. After Phase 10, all of that is accessible via nine clean REST endpoints with authentication, rate limiting, real-time streaming, and Prometheus metrics.
+
+**WHY FASTAPI AND NOT FLASK OR DJANGO?**
+FastAPI is the modern Python web framework for APIs. It was purpose-built for REST APIs in 2018, specifically to address Flask's limitations (no async support, no automatic validation, no OpenAPI docs) and Django's overhead (a full web framework with an ORM, templates, and admin panel — far more than an API needs). FastAPI provides: automatic OpenAPI documentation generation (the /docs endpoint is fully auto-generated from your Pydantic schemas and route signatures), native async/await support (critical for non-blocking LLM calls and SSE streaming), Pydantic integration for request/response validation, and dependency injection for auth and rate limiting. In 2024–2026, FastAPI is the standard choice for Python ML/AI APIs — used by Hugging Face, LangChain, and most AI startups.
+
+**WHAT IS AN API FACTORY PATTERN?**
+Instead of writing app = FastAPI() at the module level, we use a create_app() factory function. The factory pattern has three advantages: First, test isolation — each test can call create_app() to get a fresh, clean app instance with no shared state between tests. Second, configuration flexibility — create_app() can accept parameters or read environment variables to create different app variants (a full-featured production app vs. a lightweight health-check-only app). Third, future multi-app support — a factory makes it trivial to create a v2 API alongside the v1 API. The module-level app = create_app() call at the bottom of main.py is what uvicorn actually imports.
+
+**WHAT IS THE LIFESPAN CONTEXT MANAGER?**
+The lifespan context manager replaces the deprecated @app.on_event("startup") and @app.on_event("shutdown") decorators. It uses Python's standard async context manager protocol: code before yield runs at startup, code after yield runs at shutdown. At startup, the LLM routing table is loaded into memory so the first triage request doesn't suffer a cold-start penalty. At shutdown, database connections and HTTP clients drain gracefully — preventing data corruption from abrupt termination. This pattern is especially important for rolling deployments where a new pod starts, finishes startup, begins receiving traffic, and then the old pod gets a shutdown signal.
+
+**WHY ASYNC BACKGROUND PROCESSING FOR TRIAGE?**
+LLM calls take 2–8 seconds. Blocking the HTTP connection for that duration would mean: the client needs a 10-second timeout (most APIs default to 30s but SLAs require <5s response), one blocked connection holds a thread/worker, and under load, 100 concurrent 5-second triage requests would saturate a server with 4 workers. The solution is fire-and-forget: accept the ticket (200ms), return immediately with a ticket_id (202 Accepted), run LangGraph in a background task asynchronously, and let the client either poll GET /triage/{id} or subscribe to the SSE stream. This is the same pattern used by OpenAI's batch API, Stripe's async webhooks, and every production ML inference system with latency above 1 second.
+
+**WHAT IS JWT AUTHENTICATION AND HOW DOES IT WORK?**
+JWT (JSON Web Token) is a compact, URL-safe token format consisting of three base64-encoded parts separated by dots: header (algorithm), payload (claims: tenant_id, role, expiry), and signature (HMAC-SHA256 of header + payload using a secret key). Stateless: the server doesn't query a database to validate a JWT — it re-computes the expected signature from the header and payload and compares it to the signature in the token. If they match and the token hasn't expired, the caller is authenticated. This means any API pod can validate a JWT without shared session state or a Redis lookup — ideal for horizontally scaled microservices. In CustomerCore, the tenant_id extracted from the JWT's payload is the data isolation key for every downstream query: ChromaDB collection, DuckDB WHERE clause, and Supabase RLS policy all filter by this tenant_id.
+
+**WHAT IS RBAC AND WHY DOES IT MATTER?**
+Role-Based Access Control (RBAC) assigns permissions to roles rather than individual users. CustomerCore has three roles: support_agent (can submit tickets and read results), manager (can also resume HITL paused tickets), admin (full access). The HITL resume endpoint is restricted to manager and admin via the require_role() dependency. Why? A support_agent should not be able to approve their own escalation bypass — that would defeat the entire purpose of the HITL safety checkpoint. RBAC is a standard security pattern in B2B SaaS: in Salesforce, GitHub, AWS IAM, and every enterprise system, permission boundaries prevent privilege escalation even if a lower-privilege account is compromised.
+
+**WHAT IS TENANT ISOLATION AND WHY DO WE RETURN 404 INSTEAD OF 403?**
+Multi-tenant isolation means that tenant A cannot see tenant B's data. When tenant B tries to read tenant A's ticket, the API returns 404 (Not Found) rather than 403 (Forbidden). This is intentional: a 403 response confirms that the ticket exists (just forbidden). A 404 response gives the attacker no information — they don't know if the ticket ID they guessed is real or not. This defense pattern is called "tenant enumeration prevention" and it's a standard security practice in multi-tenant SaaS platforms. It prevents a compromised account from confirming the existence of resources in other tenants by probing IDs.
+
+**WHAT ARE SERVER-SENT EVENTS AND HOW DO THEY DIFFER FROM WEBSOCKETS?**
+Server-Sent Events (SSE) is a W3C standard for unidirectional server-to-client streaming over a regular HTTP connection. The client makes one GET request and the connection stays open. The server pushes text events (each ending with a double newline) as data becomes available. WebSockets are bidirectional (both client and server can send at any time) and require a protocol upgrade handshake. SSE is the correct choice for triage progress because the client only needs to receive updates — it never sends messages on the same connection. SSE also has one critical production advantage: it works through HTTP proxies, corporate firewalls, and CDNs that block WebSocket upgrade headers. The browser's built-in EventSource API handles SSE reconnection automatically on network drops.
+
+**WHAT IS PROMETHEUS AND HOW DOES SCRAPING WORK?**
+Prometheus is a time-series database and monitoring system. Unlike logging (which records discrete events), Prometheus records numeric metrics that change over time — request counts, latency distributions, error rates, cost totals. It uses a pull model: Prometheus server periodically sends HTTP GET requests to /api/v1/metrics on every registered service (this is called scraping). The response is in the OpenMetrics text format — plain text, one metric per line. Prometheus stores the scraped values as time-series data and exposes a query language (PromQL) for Grafana to query. Counters (total_requests) only increase — you query the rate() of change. Histograms record a distribution of values in configurable buckets, enabling percentile calculations (p50, p95, p99 latency).
+
+**WHAT IS A MULTI-STAGE DOCKER BUILD?**
+A multi-stage Dockerfile uses multiple FROM instructions, where each stage has a name (AS builder, AS runtime). The first stage (builder) installs all dependencies including build tools like gcc, g++, and libffi-dev — tools needed to compile C extensions in Python packages. The second stage (runtime) starts fresh from the same base image and copies only the installed packages from the builder stage using COPY --from=builder. The build tools are NOT present in the final image. Results: 60% smaller image (no build tools, no temp files), smaller attack surface (no gcc in production means fewer potential CVEs to exploit), and faster container startup (smaller image = faster pull and load).
+
+**WHY DOES THE READINESS PROBE CHECK EXTERNAL SERVICES BUT THE LIVENESS PROBE DOES NOT?**
+Kubernetes uses these two probes for different decisions. The liveness probe answers: "Is this pod still alive and not stuck in a deadlock?" If it fails, Kubernetes restarts the pod. It should be simple and reliable — if Redis is down, we don't want Kubernetes to restart all our API pods in a loop (that makes the outage much worse). The readiness probe answers: "Is this pod ready to receive traffic?" If it fails, Kubernetes removes the pod from the load balancer without restarting it. It SHOULD check dependencies — if Redis is unreachable, we should stop sending requests to that pod until Redis recovers. This separation prevents two production failure scenarios: the restart loop (liveness checks external services) and the silent failure (readiness never checks external services).
+
+**WHAT IS THE DIFFERENCE BETWEEN 200, 202, 404, 409, 422, AND 503 STATUS CODES?**
+HTTP status codes have precise semantic meanings that API consumers depend on for error handling. 200 OK: request succeeded, response body contains the result. 202 Accepted: request received and valid, but processing is not yet complete — the body contains a ticket_id to poll later. 404 Not Found: the requested resource doesn't exist (or is hidden for security reasons). 409 Conflict: the request is valid but conflicts with current state — used for HITL resume on a ticket that's not in HITL status. 422 Unprocessable Entity: the request body failed validation — used by FastAPI when Pydantic schema validation fails (e.g., text too short). 503 Service Unavailable: the server is temporarily unable to handle requests — returned by the readiness probe when dependencies are down.
+
+**KEY INTERVIEW QUESTIONS THIS PHASE PREPARES YOU FOR:**
+
+Q: What is FastAPI and why is it preferred over Flask for ML APIs?
+   A: FastAPI is a modern Python web framework built on Starlette and Pydantic. Compared to Flask, FastAPI provides native async/await support for non-blocking I/O (critical for LLM calls and SSE streaming), automatic OpenAPI documentation generation from type annotations (no manual Swagger writing), built-in Pydantic request/response validation (no manual error handling for bad inputs), and a dependency injection system for clean auth and rate limiting. Flask has no async support, no automatic validation, and no built-in docs. For an AI API making concurrent LLM calls and streaming responses, Flask would require significant manual infrastructure that FastAPI provides out of the box.
+
+Q: What is the difference between synchronous and asynchronous request handling?
+   A: Synchronous (Flask, Django): one worker thread handles one request at a time. If a request takes 5 seconds (LLM call), that thread is blocked for 5 seconds and cannot handle other requests. With 4 workers and 100 concurrent requests, 96 requests wait in queue. Asynchronous (FastAPI with uvicorn): while one coroutine waits for an LLM response (I/O-bound wait), the event loop runs other coroutines. 4 async workers can handle 100 concurrent requests because they share waiting time. This is the fundamental difference: sync blocks the thread, async yields the thread to the event loop during I/O waits. FastAPI's BackgroundTasks go further — the response is returned immediately and the background task runs without blocking the event loop.
+
+Q: How does JWT authentication prevent tenant data leakage between customers?
+   A: The JWT's tenant_id claim is the trust boundary. When a caller authenticates, the verified (cryptographically signed) tenant_id from their token is injected into every downstream data access: the ChromaDB query filters by tenant_id collection, the DuckDB SQL adds WHERE tenant_id = ?, and the Supabase Row Level Security policy filters by tenant_id. Even if a caller knows another tenant's ticket ID, the API returns 404 because the tenant_id in their JWT doesn't match the ticket's tenant_id. The caller's request body cannot override the JWT's tenant_id — the route handler always uses caller.tenant_id from the verified token, never body.tenant_id.
+
+Q: What is rate limiting and why is it per-tenant rather than per-IP?
+   A: Rate limiting prevents any single caller from overwhelming the API with requests. Without it, a single misconfigured client loop could exhaust the server's LLM budget in minutes. We use per-tenant rate limiting rather than per-IP because B2B customers have multiple IPs — an enterprise customer might have offices in London, New York, and Singapore, all calling from different IPs. IP-based limiting would incorrectly block legitimate traffic from the same customer. Tenant-based limiting (key = tenant_id extracted from JWT) treats the entire customer as one unit, ensuring fair usage across the platform regardless of how many IPs they use. The limit (100 triage requests/minute) is generous for B2B — real support volumes are far lower.
+
+Q: What is the OpenMetrics / Prometheus text format and how does Grafana use it?
+   A: OpenMetrics is a plain-text format for exposing metrics: each metric has a TYPE declaration (counter, histogram, gauge), a HELP description, and then one or more labeled value lines. Prometheus scrapes the /metrics endpoint every 15 seconds and stores all values as time-series with millisecond timestamps. Grafana connects to Prometheus via the PromQL query language: rate(customercore_triage_requests_total[5m]) gives requests per second averaged over 5 minutes. histogram_quantile(0.95, customercore_triage_duration_ms) gives the 95th percentile latency. These queries power Grafana dashboard panels — real-time graphs, alert thresholds, and SLA compliance views. The entire pipeline from application metric to Grafana dashboard requires zero changes to the application after initial instrumentation.
+
+Q: What is the difference between liveness and readiness probes in Kubernetes?
+   A: Liveness probe: "Is the process running and not stuck?" Kubernetes restarts the pod if it fails. Should check only the application process itself — never external dependencies. Readiness probe: "Is the pod ready to serve traffic?" Kubernetes removes it from the load balancer if it fails, without restarting. Should check all external dependencies (Redis, ChromaDB, Supabase). The separation prevents two failure modes: the restart loop (if liveness checks Redis and Redis goes down, Kubernetes kills and restarts all pods in a loop, making a temporary Redis outage into a full service outage) and silent failure (if readiness never checks Redis, Kubernetes keeps sending traffic to pods that can't fulfill requests).
+
+Q: Why use 202 Accepted instead of 200 OK for ticket submission?
+   A: The HTTP specification defines 202 Accepted as: "the request has been accepted for processing, but the processing has not been completed." Using 202 correctly communicates to API consumers that they should not expect a result in the response body — they need to poll separately. Using 200 OK for an async operation would be misleading — it implies the operation completed successfully when it hasn't. This is not just semantics: client libraries that integrate with CustomerCore can use the status code to determine their behavior automatically. A 202 triggers the polling logic; a 200 triggers the result-reading logic. Correct HTTP semantics reduce integration bugs.
+
+Q: What is CORS and why does the API need it?
+   A: Cross-Origin Resource Sharing (CORS) is a browser security mechanism that prevents JavaScript on one domain (e.g., evil.com) from making requests to another domain (e.g., customercore-api.com) without permission. By default, browsers block cross-origin API calls. For the Operations Console frontend (a separate origin from the API) to call /api/v1/triage, the API must explicitly allow it by responding with Access-Control-Allow-Origin headers. The CORSMiddleware in FastAPI handles this: it reads the request's Origin header and, if it's in the allowed list, adds the appropriate CORS headers to the response. In production, the allowed origins list is restricted to the specific frontend domain — not wildcard "*" — to prevent any website from calling the API on behalf of a logged-in user.
+
+Q: What is structured logging and why is it better than print() statements?
+   A: Structured logging records log entries as machine-parseable JSON objects rather than free-form text strings. A print() statement produces "Processing ticket abc123" — a human can read it but a log aggregation system (Datadog, Grafana Loki, AWS CloudWatch) must parse the free-form text with fragile regex. structlog produces {"level": "info", "event": "HTTP request", "method": "POST", "path": "/api/v1/triage", "status_code": 202, "duration_ms": 187, "request_id": "abc-123", "timestamp": "2026-05-23T19:00:00Z"} — every field is a queryable key-value pair. In a production system with 10,000 requests/minute, structured logs enable instant filtering: "show all requests from tenant acme-corp that took over 5000ms in the last hour." This query is instant on JSON logs; impossible on free-form text.
+
+Q: What is a dependency injection system and how does FastAPI use it?
+   A: Dependency injection is a design pattern where a function declares what it needs (dependencies) and a framework provides them automatically at call time. In FastAPI, the Depends() system works like this: a route handler declares caller: AuthenticatedTenant = Depends(verify_token). When FastAPI receives a request for that route, it automatically calls verify_token() first, extracts the result, and passes it as the caller argument. If verify_token() raises an HTTPException, FastAPI returns the error response without calling the route handler. This makes dependencies composable (require_role("manager") wraps verify_token), testable (inject a mock in tests), and reusable (the same verify_token dependency is used by all protected routes). The alternative — calling verify_token() manually in every route — is error-prone and verbose.
+
 
