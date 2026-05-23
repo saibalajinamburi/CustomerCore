@@ -50,45 +50,98 @@ router = APIRouter(prefix="/api/v1/triage", tags=["Triage"])
 async def _run_triage(ticket_id: str, text: str, customer_id: str, tenant_id: str,
                       customer_tier: str, channel: str) -> None:
     """
-    Background task: runs the full LangGraph 6-agent supervisor for one ticket.
-
-    This function runs in a FastAPI background task — not blocking the HTTP response.
-    It updates the triage_store as state progresses (PENDING → PROCESSING → COMPLETE/HITL/FAILED).
-
-    Error handling strategy:
-      - Any exception is caught and stored as FAILED status
-      - The ticket_id remains queryable — callers learn what went wrong
-      - Critical tickets trigger a fallback heuristic classification if LangGraph fails
-        (ensures 0% silent failure rate on P1/critical tickets)
+    Background task: runs the full LangGraph 6-agent supervisor for one ticket,
+    then validates the output through the Constitutional Policy Engine (Phase 11)
+    and records the full trace in Langfuse (Phase 11).
     """
+    from src.monitoring.langfuse_tracer import TriageTrace
+    from src.responsible_ai.constitutional_policy import policy_engine
+
+    # Open a Langfuse trace for this triage request
+    trace = TriageTrace.start(
+        ticket_id=ticket_id,
+        tenant_id=tenant_id,
+        customer_id=customer_id,
+        customer_tier=customer_tier,
+        channel=channel,
+        text_preview=text[:200],
+    )
+
     triage_store.set_processing(ticket_id)
 
     try:
-        # Import here to avoid circular imports at module load time
         from src.agent.supervisor import run_triage
 
-        result = run_triage(
-            ticket_text=text,
-            customer_id=customer_id,
-            tenant_id=tenant_id,
-            customer_tier=customer_tier,
-            channel=channel,
-        )
+        with trace.agent_span("langgraph_supervisor") as sup_span:
+            result = run_triage(
+                ticket_text=text,
+                customer_id=customer_id,
+                tenant_id=tenant_id,
+                customer_tier=customer_tier,
+                channel=channel,
+            )
+            sup_span.update(output=str(result)[:500] if result else "none")
 
-        # Check if the result requires HITL (supervisor returned paused state)
+        # ── Constitutional Policy Check (Phase 11) ────────────────────────
+        if isinstance(result, dict):
+            resolution = result.get("suggested_resolution", "")
+            if resolution:
+                with trace.agent_span("constitutional_check") as policy_span:
+                    verdict = policy_engine.evaluate(
+                        response_text=resolution,
+                        context={
+                            "detected_language": result.get("detected_language", "en"),
+                            "customer_tier": customer_tier,
+                            "tenant_id": tenant_id,
+                        },
+                    )
+                    policy_span.update(output=verdict.summary())
+
+                # Record constitutional score to Langfuse
+                trace.score_constitutional(
+                    verdict.score,
+                    comment=verdict.summary(),
+                )
+
+                # Apply remediation
+                result["constitutional_score"] = verdict.score
+                result["constitutional_passed"] = verdict.passed
+                result["constitutional_violations"] = [
+                    {"rule": v.rule_id, "severity": v.severity.value,
+                     "action": v.action.value, "evidence": v.evidence[:100]}
+                    for v in verdict.violations
+                ]
+
+                if not verdict.passed and verdict.action.value == "block":
+                    # Critical violation — replace response with safe fallback
+                    result["suggested_resolution"] = verdict.safe_fallback
+                    result["constitutional_blocked"] = True
+
+                if not verdict.passed and result.get("priority") not in ("critical", "high"):
+                    # Violations upgrade priority to ensure human review
+                    if verdict.has_critical:
+                        result["hitl_required"] = True
+                        result["hitl_reason"] = (
+                            f"Constitutional violation: {verdict.violations[0].rule_name}"
+                        )
+
+        # ── HITL or Complete ──────────────────────────────────────────────
         if isinstance(result, dict) and result.get("hitl_required"):
             triage_store.set_hitl(
                 ticket_id,
                 hitl_reason=result.get("hitl_reason", "Low confidence or critical priority"),
             )
-            # Store partial result so the HITL reviewer sees the AI's work so far
             triage_store.set_complete(ticket_id, result)
-            triage_store._status[ticket_id] = TriageStatus.HITL  # Re-set to HITL
+            triage_store._status[ticket_id] = TriageStatus.HITL
         else:
             triage_store.set_complete(ticket_id, result or {})
 
+        trace.finish(status="complete")
+
     except Exception as exc:
         triage_store.set_failed(ticket_id, error=str(exc))
+        trace.finish(status="failed")
+
 
 
 # ─────────────────────────────────────────────────────────────────────────────

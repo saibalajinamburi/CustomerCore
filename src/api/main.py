@@ -131,6 +131,16 @@ async def lifespan(app: FastAPI):
              env=os.getenv("APP_ENV", "development"),
              version="1.0.0")
 
+    # Register Langfuse as LiteLLM callback (Phase 11 — LLM Observability)
+    try:
+        from src.monitoring.langfuse_tracer import setup_litellm_tracing
+        tracing_enabled = setup_litellm_tracing()
+        log.info("Langfuse LLM tracing",
+                 enabled=tracing_enabled,
+                 configured=bool(os.getenv("LANGFUSE_PUBLIC_KEY")))
+    except Exception as exc:
+        log.warning("Langfuse init failed (non-fatal)", error=str(exc))
+
     # Warm up LLM router (loads routing table into memory)
     try:
         from src.rag.router import SLARouter
