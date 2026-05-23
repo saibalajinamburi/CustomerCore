@@ -3010,3 +3010,143 @@ Q: What is a dependency injection system and how does FastAPI use it?
    A: Dependency injection is a design pattern where a function declares what it needs (dependencies) and a framework provides them automatically at call time. In FastAPI, the Depends() system works like this: a route handler declares caller: AuthenticatedTenant = Depends(verify_token). When FastAPI receives a request for that route, it automatically calls verify_token() first, extracts the result, and passes it as the caller argument. If verify_token() raises an HTTPException, FastAPI returns the error response without calling the route handler. This makes dependencies composable (require_role("manager") wraps verify_token), testable (inject a mock in tests), and reusable (the same verify_token dependency is used by all protected routes). The alternative — calling verify_token() manually in every route — is error-prone and verbose.
 
 
+
+---
+
+PHASE 11 COMPLETE: Langfuse LLM Observability + Constitutional Policy Engine
+
+Date: 2026-05-23
+Why: "You cannot manage what you cannot measure. Phase 11 adds two layers of intelligence above the raw AI outputs: first, full observability so you can see exactly what every LLM was asked and what it said; second, a constitutional safety gate that catches dangerous, illegal, or inappropriate responses before they ever reach a customer."
+
+Files created:
+  src/monitoring/__init__.py
+  src/monitoring/langfuse_tracer.py
+  src/responsible_ai/constitutional_policy.py
+  tests/unit/test_phase11_policy.py — 38 tests, 38 passing
+
+Key numbers: 4 new files, 1476 lines, 7 constitutional rules, 38 tests
+
+---
+
+PHASE 11a: Langfuse LLM Observability
+
+Context: After Phase 10, the API was live and triage was running. But if a triage went wrong — wrong classification, hallucinated KB citation, slow response — there was no way to find out why. Which LLM was called? What was the exact prompt? How many tokens were used? How much did it cost? Langfuse answers all of these questions with zero manual logging.
+
+What Langfuse does:
+  Langfuse is an open-source LLM observability platform — think of it as Sentry, but for language models. While Sentry captures application errors and stack traces, Langfuse captures every LLM interaction: the exact prompt sent, the completion received, the model used, latency, token counts, and cost. All of this is attached to a hierarchical trace that shows you the full lifecycle of one triage request across all 6 agents.
+
+The Trace → Span → Generation hierarchy:
+  Every triage request opens one Langfuse TRACE (the top level, like an HTTP request in Sentry).
+  Within that trace, each agent creates a SPAN (a named logical step: classify_agent, rag_agent, constitutional_check).
+  Within each span, each LLM API call creates a GENERATION (the atomic unit: one prompt-completion pair with tokens and cost).
+  Quality SCORES (0–1) are attached to the trace after evaluation: constitutional_compliance, resolution_quality, rag_grounding.
+
+LiteLLM callback integration:
+  LiteLLM has built-in Langfuse support via success_callback and failure_callback lists. When langfuse is in these lists, every litellm.completion() call is automatically traced without changing any business logic code. This is the zero-code-change integration pattern — the monitoring infrastructure is entirely separate from the agent code.
+
+Graceful degradation design:
+  All Langfuse functions check whether LANGFUSE_PUBLIC_KEY is set in the environment. If not, they return no-op stub objects (NoOpTrace, NoOpSpan) that have exactly the same interface as real Langfuse objects but do nothing. This means: unit tests pass without a Langfuse account, local development works offline, and the exact same business logic code runs in dev and production with no if/else branches. The observability layer is invisible to the business logic.
+
+---
+
+PHASE 11b: Constitutional Policy Engine
+
+Context: The LangGraph supervisor generates AI responses, but those responses are not verified to be safe, compliant, or appropriate before they reach the customer. A base LLM may generate responses that promise refunds (creating legal obligations), deny being an AI (violating EU law), leak PII from the ticket context, or give legal advice without a licence. The constitutional engine is the final safety gate.
+
+What Constitutional AI means:
+  Constitutional AI is an approach from Anthropic (2022). Instead of human labellers reviewing every output, you write a document — the constitution — that defines what acceptable AI behaviour looks like. The AI's outputs are evaluated against this written constitution programmatically, at scale, in milliseconds. The constitution is transparent (auditable), version-controlled (changes go through code review), and can be updated in minutes when new risks emerge.
+
+The CustomerCore Constitution — 7 rules:
+
+  Rule 1: PII_PROTECTION (CRITICAL)
+    What: Response must not contain raw personal identifiable information: email addresses, phone numbers, SSNs, IBANs, or credit card numbers.
+    Why: If the AI echoes back PII from a previous ticket or context window into a new response, that is a GDPR data breach under Article 5 (data minimisation). The fine is up to 4% of global annual turnover. Detection uses compiled regex patterns checked against the full response text.
+    Action: REDACT — remove the violating section and return the cleaned response.
+
+  Rule 2: AI_IDENTITY (CRITICAL)
+    What: Response must not deny being an AI or claim to be human.
+    Why: EU AI Act Article 52 (Transparency Obligations) explicitly requires AI systems interacting with humans to disclose that they are AI unless the human already knows. Claiming to be human is a regulatory violation and destroys trust permanently when the deception is discovered.
+    Action: BLOCK — replace the entire response with the safe fallback text.
+
+  Rule 3: TOXICITY_GUARD (CRITICAL)
+    What: Response must not contain harmful, abusive, or discriminatory language.
+    Why: A single disrespectful response to a frustrated customer can go viral, leading to brand damage, support escalation, and potential legal action. Customer support AI must maintain professional tone at all times.
+    Action: BLOCK — replace with safe fallback.
+
+  Rule 4: NO_COMMITMENTS (VIOLATION)
+    What: Response must not make definitive promises about refund amounts, SLA timelines, or delivery dates.
+    Why: An AI statement like "We will refund the full amount within 24 hours" creates a contractual obligation. If the company cannot fulfill it, the customer has grounds for a breach of contract claim. Legal teams have explicitly flagged automated refund promises as a liability risk.
+    Action: REGENERATE — ask the LLM to rephrase with hedged language.
+
+  Rule 5: SCOPE_LIMITATION (VIOLATION)
+    What: Response must not provide legal, medical, or financial advice.
+    Why: Providing professional advice in regulated domains without a licence violates laws in every jurisdiction (unauthorised legal advice, practising medicine without a licence, financial advice without FCA/SEC registration). This applies even if the advice is technically correct.
+    Action: REDACT — remove the offending section.
+
+  Rule 6: LANGUAGE_CONSISTENCY (WARNING)
+    What: Response should be in the same language as the ticket.
+    Why: If a customer writes in German and receives a response in English, they feel ignored and disrespected. The multilingual model (Phase 8) is designed to produce responses in the ticket's language — a language mismatch indicates a routing or model failure.
+    Action: WARN — flag in audit log, increment metrics, allow the response.
+
+  Rule 7: COMPETITOR_NEUTRAL (WARNING)
+    What: Response must not directly disparage or compare competitors.
+    Why: Direct competitor comparisons create legal risk (defamation, trade disparagement) and are brand policy violations at most enterprises. Even positive comparisons ("We're better than Zendesk at X") require legal approval.
+    Action: WARN — flag in audit log.
+
+Severity and Action system:
+  CRITICAL violations: Block the entire response immediately. Replace with a safe generic fallback text. Trigger automatic HITL escalation so a human reviews what happened. Log to the audit trail with full evidence.
+  VIOLATION: Flag the response. Attempt automated remediation (redact or regenerate). If not resolvable, escalate to HITL.
+  WARNING: Allow the response but record the flag in the audit log and increment the relevant Prometheus counter. A pattern of warnings (same rule firing repeatedly) triggers a review.
+
+Score calculation:
+  Each violation deducts 20 points from a 100-point score. Each warning deducts 5 points. A clean response scores 1.0. A response with one critical violation scores 0.8. A response with two violations and two warnings scores 0.5. These scores are logged to Langfuse as quality metrics, enabling trend analysis — "is our constitutional compliance getting better or worse over time?"
+
+Fast path architecture:
+  All 7 rules use compiled regex patterns checked in under 5 milliseconds total. This is critical for production performance — the constitutional check runs on every triage, so it cannot add measurable latency. For Phase 16, LLM-based constitutional checking (slower but more nuanced) will be added as an optional slow path for borderline cases.
+
+---
+
+PHASE 11 DEEP DIVE — LLM Observability and Responsible AI
+
+WHAT IS LLM OBSERVABILITY AND WHY IS IT DIFFERENT FROM REGULAR LOGGING?
+Traditional application observability monitors infrastructure metrics: CPU usage, memory, request latency, error rates. These tell you that something failed. LLM observability monitors the AI content layer: what prompt was sent, what model was used, what the completion said, how many tokens were consumed, and what it cost. These tell you why something failed — and what the AI actually did. Without LLM observability, debugging a wrong classification requires guessing. With Langfuse, you open the trace, see the exact prompt and completion, and identify the issue in 30 seconds.
+
+WHY DOES LANGFUSE USE A TRACE/SPAN/GENERATION HIERARCHY?
+This hierarchy is borrowed from distributed tracing systems (OpenTelemetry, Jaeger, Zipkin) that have been used to debug microservice architectures for a decade. A TRACE represents one user request end-to-end — the same concept whether the request touches 6 microservices or 6 AI agents. A SPAN represents one logical operation within that request — one service call, one agent's work. A GENERATION is specific to LLMs: it is one prompt-completion pair. This hierarchy lets you answer different questions at different levels: the trace answers "how did this triage request go overall?" The span answers "what did the classify_agent do?" The generation answers "exactly what tokens were sent and received?"
+
+WHAT IS THE DIFFERENCE BETWEEN A COUNTER, A HISTOGRAM, AND A SCORE IN OBSERVABILITY?
+Counter (Prometheus): a number that only increases, used for totals. llm_calls_total increases by 1 every time an LLM is called. You query the rate of change.
+Histogram (Prometheus): records the distribution of a value across configurable buckets. triage_duration_ms records how long each triage took, enabling p50/p95/p99 latency percentiles.
+Score (Langfuse): a human-readable quality rating (0–1 or 1–10) attached to a trace or generation. constitutional_score = 0.95 means this response passed 95% of the constitutional evaluation. Scores enable quality trending over time — you can see if AI output quality is improving or degrading after a model update.
+
+WHY IS THE SAFE FALLBACK TEXT A CONSTITUTIONAL RULE OUTCOME?
+When a critical violation is detected (AI claiming to be human, PII leak, toxic language), the response is replaced with a safe generic message: "Thank you for contacting support. We've received your request and a member of our team will review it." This is the safe fallback. The customer still gets a response — they don't see a blank error page — but the dangerous content never reaches them. The HITL flag ensures a human reviews the original violated response and the ticket is handled correctly. Safe fallbacks are a standard pattern in production AI safety — every responsible AI system must have them.
+
+WHAT IS THE EU AI ACT AND HOW DOES IT AFFECT CUSTOMERCORE?
+The EU AI Act (enforcement began August 2024) classifies AI systems by risk level. Customer support AI is classified as LIMITED RISK (not high risk, not prohibited). Limited risk AI systems must comply with Article 52 transparency obligations: (1) inform users they are interacting with an AI, (2) ensure AI-generated content can be identified as such. The AI_IDENTITY constitutional rule directly implements Article 52. The EU AI Act also requires technical documentation (Phase 16's model cards) and logging of inputs/outputs for high-risk use cases. Langfuse tracing is the technical implementation of this logging requirement.
+
+WHAT IS THE DIFFERENCE BETWEEN REDACT, REGENERATE, AND BLOCK?
+REDACT: Remove only the violating portion of the text and return the rest. Used for PII leaks (remove the email address, keep the surrounding helpful text) and scope violations (remove the legal advice paragraph, keep the product support information).
+REGENERATE: Send the response back to the LLM with an explicit instruction to rewrite it without the violation. Used for commitment language (rephrase "we will refund" as "our team will review your refund request"). More expensive (one extra LLM call) but produces a more natural result than simple redaction.
+BLOCK: Replace the entire response with the safe fallback text. Used for the most severe violations (AI identity denial, toxic content) where no part of the response is safe to keep. The original response is preserved in the audit trail for human review.
+
+WHAT IS GDPR ARTICLE 5 AND HOW DOES THE PII_PROTECTION RULE ENFORCE IT?
+GDPR Article 5 establishes data minimisation as a core principle: personal data may only be processed to the extent necessary for the stated purpose. When an AI support agent is asked about a billing issue, it should not include the customer's phone number or email in its response — that is unnecessary data sharing. The PII_PROTECTION rule uses compiled regex patterns to detect email addresses, phone numbers, SSNs, IBANs, and credit card numbers in AI responses. If found, the violating data is redacted before the response leaves the system. This implements the technical side of GDPR compliance — the principle that personal data should not escape the context in which it was collected.
+
+KEY INTERVIEW QUESTIONS THIS PHASE PREPARES YOU FOR:
+
+Q: What is Constitutional AI and how did Anthropic develop the concept?
+   A: Constitutional AI (Anthropic, 2022) is an approach to AI alignment where a set of written principles — a constitution — defines what acceptable AI behaviour looks like. Original implementation: generate an initial response, then use a critique model to evaluate whether the response violates any constitutional principles, then revise based on the critique (Critique-Revision). CustomerCore implements a simpler version: deterministic fast-path rules (regex-based) for high-frequency safety checks, with LLM-based slow-path evaluation planned for Phase 16. The key insight is that written, auditable rules are more trustworthy than opaque human preference labels because you can explain exactly why a response was blocked.
+
+Q: How do you monitor LLM costs in production, and why does it matter?
+   A: LLM costs are non-linear and can grow rapidly with usage. A single misconfigured prompt that adds 500 extra tokens multiplied by 10,000 requests per day adds significant monthly cost. Langfuse tracks token usage and cost per generation, per agent, and per model. With this data you can answer: which agent consumes the most tokens? Could we shorten its prompt by 30% without losing accuracy? Which model provides the best quality-per-dollar ratio for each task type? In enterprise settings, LLM cost attribution per tenant (how much did serving Acme Corp cost this month?) is required for usage-based billing. The llm_cost_usd_total Prometheus counter provides this attribution.
+
+Q: What is the principle of least privilege and how does RBAC implement it?
+   A: Principle of least privilege: every component (user, process, API client) should have only the minimum permissions needed to perform its function. In CustomerCore's RBAC: a support_agent can submit tickets and read results but cannot approve HITL decisions (they have no authority to override safety checks). A manager can approve HITL decisions for their team's tickets. An admin has full access. This prevents privilege escalation: if a support_agent account is compromised, the attacker can submit fake tickets but cannot disable the safety checkpoints or read other tenants' data. RBAC is implemented in FastAPI via the require_role() dependency — it checks the JWT's role claim before executing any protected route handler.
+
+Q: How would you extend the constitutional engine to catch hallucinations?
+   A: Hallucination in RAG systems means the AI cites a knowledge base document that doesn't exist, or misquotes one that does. The hallucination check would: (1) extract all KB citation IDs from the response text (e.g., TICKET-20241103-xyz, KB-billing-001), (2) query the ChromaDB collection to verify each cited document exists, (3) for documents that exist, compute semantic similarity between the citation and the document content — if similarity < 0.7, the AI likely misquoted it. This is called "grounding verification" and is a critical safety check for RAG systems in high-stakes domains (legal, medical, financial). The score logged to Langfuse as rag_grounding tracks this metric over time.
+
+Q: What is a no-op stub and why is it better than if/else branching for optional services?
+   A: A no-op stub is an object that implements the same interface as a real service but does nothing. When Langfuse is not configured, TriageTrace.start() returns a NoOpTrace whose every method silently succeeds. The triage router code calls trace.score_constitutional(0.95) in exactly the same way regardless of whether Langfuse is configured — it doesn't check first. Compare this to the alternative: if langfuse_configured: trace.score(). With no-op stubs, there is zero conditional branching in business logic code, making it cleaner and less error-prone. The pattern also means tests automatically work without Langfuse credentials — the no-op stubs are always returned in test environments.
+
