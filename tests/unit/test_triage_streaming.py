@@ -8,8 +8,9 @@ from src.api.routers.triage import submit_ticket
 from src.api.models import TicketSubmitRequest, CustomerTier, TicketChannel
 
 class TestProducerHelper:
+    @patch("socket.create_connection")
     @patch("src.streaming.producer_helper.Producer")
-    def test_get_producer_initializes_once(self, mock_producer_cls):
+    def test_get_producer_initializes_once(self, mock_producer_cls, mock_create_connection):
         # Reset singleton just for this test
         import src.streaming.producer_helper as ph
         ph._PRODUCER = None
