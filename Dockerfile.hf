@@ -42,12 +42,11 @@ RUN useradd -m -u 1000 hfuser
 
 WORKDIR /app
 
-# Install lightweight requirements (no PySpark, no JDK)
-COPY requirements.txt .
-# Filter out PySpark from requirements for HF deployment
-RUN grep -v "pyspark" requirements.txt > requirements_hf.txt \
-    && pip install --no-cache-dir -r requirements_hf.txt \
-    && rm requirements_hf.txt
+# Use the slim CI requirements file — already Linux-safe (no pywin32, pyspark, etc.)
+COPY requirements-ci.txt .
+RUN pip install --no-cache-dir \
+    --extra-index-url https://download.pytorch.org/whl/cpu \
+    -r requirements-ci.txt
 
 COPY src/ ./src/
 COPY pyproject.toml .
