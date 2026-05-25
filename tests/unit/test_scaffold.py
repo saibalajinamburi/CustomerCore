@@ -5,5 +5,4 @@ def test_environment_vars():
 
 def test_imports_work():
     import fastapi
-    import pydantic
     assert fastapi.__version__ is not None

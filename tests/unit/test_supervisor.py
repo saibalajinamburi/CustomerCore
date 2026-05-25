@@ -1,5 +1,4 @@
-import pytest
-from src.agent.supervisor import run_triage, resume_triage, app
+from src.agent.supervisor import run_triage, resume_triage
 from src.agent.schemas import TriageOutput
 
 def test_successful_direct_triage_no_hitl():

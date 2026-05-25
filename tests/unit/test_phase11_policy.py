@@ -26,7 +26,6 @@ Tests cover:
 
 from __future__ import annotations
 
-import pytest
 
 from src.responsible_ai.constitutional_policy import (
     ConstitutionalPolicyEngine,

@@ -10,8 +10,6 @@ Tests that:
 5. Validation correctly drops records missing required fields
 """
 
-import pytest
-from src.streaming.minio_setup import get_client, BUCKET
 from src.streaming.data_loader import enrich, TENANTS
 
 

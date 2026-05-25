@@ -15,7 +15,7 @@ Sections:
 """
 
 import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 from src.rag.multilingual import (
     detect_language, detect_language_with_confidence,
@@ -25,7 +25,6 @@ from src.rag.multilingual import (
 )
 from src.rag.graph_rag import (
     B2BKnowledgeGraph, GraphRAGEngine, GraphRAGResult,
-    TicketNode, TenantNode, CategoryNode,
 )
 from src.streaming.data_loader import enrich_massive, MASSIVE_LANGUAGES
 

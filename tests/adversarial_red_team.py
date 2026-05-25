@@ -9,8 +9,6 @@ jailbreak attempts, and safety violations on the local Kubernetes Ingress endpoi
 import asyncio
 import os
 import sys
-import time
-from uuid import uuid4
 import httpx
 
 # Ensure workspace is on the import path
@@ -18,7 +16,7 @@ WORKSPACE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if WORKSPACE_DIR not in sys.path:
     sys.path.insert(0, WORKSPACE_DIR)
 
-from src.api.auth import generate_dev_token
+from src.api.auth import generate_dev_token  # noqa: E402
 
 # Kubernetes ingress endpoint mapping port 30080
 API_BASE_URL = "http://localhost:30080"

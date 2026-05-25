@@ -8,7 +8,6 @@ Tests that:
 3. All required fields are present and correctly typed
 """
 
-import pytest
 from src.streaming.producers.ticket_producer import make_ticket
 from src.streaming.producers.billing_producer import make_billing_event
 from src.streaming.producers.product_producer import make_product_event

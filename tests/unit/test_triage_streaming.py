@@ -1,8 +1,6 @@
-import json
-import os
 import pytest
 from unittest.mock import MagicMock, patch, AsyncMock
-from src.streaming.producer_helper import publish_ticket_event, get_producer
+from src.streaming.producer_helper import publish_ticket_event
 from fastapi import BackgroundTasks
 from src.api.routers.triage import submit_ticket
 from src.api.models import TicketSubmitRequest, CustomerTier, TicketChannel

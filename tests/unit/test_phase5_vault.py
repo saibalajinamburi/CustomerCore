@@ -17,15 +17,11 @@ Tests:
 """
 
 import pytest
-import tempfile
-from pathlib import Path
-from unittest.mock import MagicMock, patch
 
 from src.responsible_ai.key_manager import TenantKeyManager
 from src.responsible_ai.privacy_vault import (
     CryptographicPrivacyVault, VaultStore, TOKEN_PATTERN
 )
-from src.responsible_ai.audit_log import _sha256
 
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────

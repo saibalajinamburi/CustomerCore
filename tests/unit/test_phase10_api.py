@@ -16,14 +16,12 @@ Tests cover:
 from __future__ import annotations
 
 import time
-from unittest.mock import patch
 
 import jwt
 import pytest
 from fastapi.testclient import TestClient
 
 from src.api.main import create_app
-from src.api.auth import generate_dev_token
 
 # ─── Fixtures ────────────────────────────────────────────────────────────────
 

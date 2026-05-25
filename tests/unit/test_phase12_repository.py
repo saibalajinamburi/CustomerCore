@@ -143,7 +143,7 @@ class TestTicketRepositoryCreate:
                 id="ticket-001", tenant_id=TENANT_ID,
                 customer_id="c1", channel="api", raw_text="test",
             )
-            result = await repo.create(record)
+            await repo.create(record)
 
         # upsert was called
         qb.upsert.assert_called_once()
@@ -205,7 +205,7 @@ class TestTicketRepositoryUpdateStatus:
             await repo.update_status("ticket-001", "complete")
 
         # eq() was called with tenant_id to enforce tenant isolation
-        eq_calls = [str(c) for c in qb.eq.call_args_list]
+        [str(c) for c in qb.eq.call_args_list]
         assert any("tenant_id" in str(c) for c in qb.eq.call_args_list), \
             "RLS double-check: eq(tenant_id) must be called in update"
 

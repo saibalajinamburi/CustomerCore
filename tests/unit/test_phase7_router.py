@@ -23,8 +23,7 @@ Sections:
 import pytest
 from unittest.mock import MagicMock, patch
 from src.rag.router import (
-    LLMRouter, RouterDecision, RouterMetrics,
-    ROUTING_TABLE, SLA_TARGETS_MS
+    LLMRouter, RouterDecision, ROUTING_TABLE, SLA_TARGETS_MS
 )
 from src.rag.llm_client import LLMClient, LLMResponse
 
