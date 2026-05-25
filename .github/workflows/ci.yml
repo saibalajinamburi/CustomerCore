@@ -44,4 +44,12 @@ jobs:
         LANGFUSE_PUBLIC_KEY: "mock-lf-public"
         LANGFUSE_SECRET_KEY: "mock-lf-secret"
         APP_ENV: "test"
-      run: pytest
+      run: |
+        pytest --tb=short > pytest_failure.log 2>&1 || (
+          git config --global user.email "github-actions@github.com"
+          git config --global user.name "GitHub Actions"
+          git add pytest_failure.log
+          git commit -m "debug: add pytest failure log [skip ci]"
+          git push origin HEAD:main
+          exit 1
+        )
