@@ -44,6 +44,7 @@ sentence-transformers==5.5.0
 transformers==5.8.1
 torch==2.12.0+cpu
 tokenizers==0.22.2
+datasets==4.8.5
 safetensors==0.7.0
 huggingface_hub==1.15.0
 
