@@ -64,6 +64,8 @@ def _get_secret_key() -> str:
     """
     key = os.getenv("LITELLM_MASTER_KEY") or os.getenv("JWT_SECRET_KEY")
     if not key:
+        if os.getenv("APP_ENV") != "production":
+            return "dev-secret-jwt-signing-key-placeholder-only"
         raise RuntimeError(
             "JWT signing key not found. Set LITELLM_MASTER_KEY or JWT_SECRET_KEY "
             "via Doppler: doppler secrets set LITELLM_MASTER_KEY=sk-your-key"

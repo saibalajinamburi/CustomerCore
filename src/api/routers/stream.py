@@ -1,38 +1,8 @@
 """
-CustomerCore API — Server-Sent Events (SSE) Stream Router (Phase 10)
+CustomerCore API — Server-Sent Events (SSE) Stream Router (Phase 13)
 
-WHY SERVER-SENT EVENTS INSTEAD OF WEBSOCKETS?
------------------------------------------------
-Both SSE and WebSockets provide real-time server → client communication.
-The key difference:
-
-  WebSocket:
-    - Bidirectional (both client and server can send messages)
-    - More complex to implement (requires upgrade handshake, heartbeats, reconnection logic)
-    - Better for chat applications, collaborative editing, live games
-
-  Server-Sent Events (SSE):
-    - Unidirectional (server → client only)
-    - Uses a regular HTTP connection — works through proxies and firewalls that block WebSockets
-    - Browsers handle reconnection automatically (EventSource API)
-    - Built-in support in FastAPI via StreamingResponse
-    - Ideal for: progress updates, live logs, dashboard feeds
-
-CustomerCore's triage stream is read-only from the client's perspective — the client
-watches triage progress but doesn't send messages. SSE is the correct choice.
-
-HOW IT WORKS:
-  1. Client subscribes: GET /api/v1/triage/{ticket_id}/stream
-  2. Server opens a long-lived HTTP connection
-  3. As the triage progresses, the server pushes status events:
-       data: {"status": "processing", "step": "classify_agent"}\n\n
-       data: {"status": "processing", "step": "rag_agent"}\n\n
-       data: {"status": "complete", "result": {...}}\n\n
-  4. Client closes the connection when it receives status=complete or status=failed
-
-SSE EVENT FORMAT (per the W3C spec):
-  data: <json_payload>\n\n
-  The double newline signals the end of one event — the browser's EventSource parses this.
+Wires the Supabase persistent repository layer into the streaming endpoints.
+Replaces the in-memory triage_store with TicketRepository.
 """
 
 from __future__ import annotations
@@ -46,7 +16,7 @@ from fastapi.responses import StreamingResponse
 
 from src.api.auth import AuthenticatedTenant, verify_token
 from src.api.models import TriageStatus
-from src.api.store import triage_store
+from src.db.repository import TicketRepository
 
 router = APIRouter(prefix="/api/v1/triage", tags=["Streaming"])
 
@@ -71,41 +41,18 @@ async def stream_triage(
     caller: AuthenticatedTenant = Depends(verify_token),
 ) -> StreamingResponse:
     """
-    Stream real-time triage progress via Server-Sent Events.
-
-    Client usage (JavaScript):
-        const source = new EventSource(
-          '/api/v1/triage/{ticket_id}/stream',
-          { headers: { Authorization: 'Bearer <token>' } }
-        );
-        source.onmessage = (e) => {
-          const event = JSON.parse(e.data);
-          if (event.status === 'complete') {
-            source.close();
-            showResult(event.result);
-          }
-        };
+    Stream real-time triage progress via Server-Sent Events from Supabase.
     """
-    record = triage_store.get(ticket_id)
+    repo = TicketRepository(caller.tenant_id)
+    record = await repo.get(ticket_id)
     if not record:
-        raise HTTPException(status_code=404, detail=f"Ticket {ticket_id} not found.")
-    if record["tenant_id"] != caller.tenant_id:
         raise HTTPException(status_code=404, detail=f"Ticket {ticket_id} not found.")
 
     async def event_generator():
         """
-        Async generator that polls the triage store and yields SSE events.
-
-        Why polling instead of true async events?
-          The LangGraph supervisor runs in a background thread (via BackgroundTasks).
-          True async event propagation would require a pub/sub system (Redis pub/sub
-          or asyncio.Queue) — that's Phase 12 territory. For now, lightweight polling
-          every 500ms is sufficient and still provides near-real-time updates.
-          With Phase 12 (Supabase + Redis), we'll upgrade to Supabase Realtime
-          (PostgreSQL logical replication → WebSocket push) for zero-latency events.
+        Async generator that polls the database and yields SSE events.
         """
         elapsed = 0.0
-        terminal_statuses = {TriageStatus.COMPLETE, TriageStatus.HITL, TriageStatus.FAILED}
         last_status = None
 
         # Send initial connection confirmation event
@@ -119,7 +66,8 @@ async def stream_triage(
             await asyncio.sleep(_POLL_INTERVAL)
             elapsed += _POLL_INTERVAL
 
-            current_status = triage_store.get_status(ticket_id)
+            rec = await repo.get(ticket_id)
+            current_status = TriageStatus(rec["status"]) if rec else None
 
             # Only emit an event if status changed (avoids flooding the client)
             if current_status != last_status:
@@ -134,7 +82,6 @@ async def stream_triage(
                     })
 
                 elif current_status == TriageStatus.HITL:
-                    rec = triage_store.get(ticket_id)
                     yield _sse_event({
                         "type": "hitl",
                         "status": "hitl",
@@ -146,28 +93,27 @@ async def stream_triage(
                     return
 
                 elif current_status == TriageStatus.COMPLETE:
-                    rec = triage_store.get(ticket_id)
-                    result = rec.get("result", {}) if rec else {}
+                    from src.api.routers.triage import row_to_response
+                    res_obj = row_to_response(rec) if rec else None
                     yield _sse_event({
                         "type": "complete",
                         "status": "complete",
-                        "category": result.get("category"),
-                        "priority": result.get("priority"),
-                        "confidence": result.get("confidence"),
-                        "churn_risk": result.get("churn_risk"),
-                        "hitl_required": result.get("hitl_required", False),
-                        "processing_ms": rec.get("processing_ms") if rec else None,
+                        "category": res_obj.category if res_obj else None,
+                        "priority": res_obj.priority.value if res_obj and res_obj.priority else None,
+                        "confidence": res_obj.confidence if res_obj else 0.85,
+                        "churn_risk": res_obj.churn_risk if res_obj else "low",
+                        "hitl_required": res_obj.hitl_required if res_obj else False,
+                        "processing_ms": res_obj.processing_ms if res_obj else None,
                         "elapsed_ms": int(elapsed * 1000),
                     })
                     yield _sse_event({"type": "done"})
                     return
 
                 elif current_status == TriageStatus.FAILED:
-                    rec = triage_store.get(ticket_id)
                     yield _sse_event({
                         "type": "error",
                         "status": "failed",
-                        "error": rec.get("error", "Unknown error") if rec else "Unknown error",
+                        "error": rec.get("error_message", "Unknown error") if rec else "Unknown error",
                         "elapsed_ms": int(elapsed * 1000),
                     })
                     yield _sse_event({"type": "done"})

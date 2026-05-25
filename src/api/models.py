@@ -258,6 +258,10 @@ class TriageResultResponse(BaseModel):
     hitl_required: bool = Field(default=False)
     hitl_reason: str | None = Field(None)
 
+    # ── Constitutional Policy Engine Audit ──
+    constitutional_blocked: bool = Field(default=False, description="Whether the resolution was blocked by the AI safety policy engine.")
+    constitutional_violations: list[dict] = Field(default_factory=list, description="List of constitutional rule violations detected.")
+
     # ── Audit ──
     created_at: datetime = Field(default_factory=datetime.utcnow)
     completed_at: datetime | None = None

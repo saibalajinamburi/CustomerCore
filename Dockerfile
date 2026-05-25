@@ -39,7 +39,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Install Python dependencies into a prefix directory (not system Python)
 # This makes it easy to copy just the packages into the runtime stage
 COPY requirements.txt .
-RUN pip install --prefix=/install --no-cache-dir -r requirements.txt
+RUN --mount=type=cache,target=/root/.cache/pip \
+    sed -i '/pywin32/d' requirements.txt && \
+    pip install --prefix=/install --extra-index-url https://download.pytorch.org/whl/cpu -r requirements.txt
 
 
 # ── Stage 2: Runtime ──────────────────────────────────────────────────────────
@@ -58,9 +60,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     APP_ENV=production \
     PORT=8080
 
-# Runtime system dependencies (JDK for PySpark)
+# Runtime system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    default-jdk-headless \
     curl \
     && rm -rf /var/lib/apt/lists/*
 

@@ -82,9 +82,8 @@ def _get_langfuse_client():
     Lazy-init to avoid network calls at import time (tests would fail).
     """
     global _langfuse_client, _langfuse_client_initialised
-    if _langfuse_client_initialised:
+    if _langfuse_client_initialised and _langfuse_client is not None:
         return _langfuse_client
-    _langfuse_client_initialised = True
     if not _is_langfuse_configured():
         return None
     try:
@@ -92,10 +91,12 @@ def _get_langfuse_client():
         _langfuse_client = Langfuse(
             public_key=os.getenv("LANGFUSE_PUBLIC_KEY"),
             secret_key=os.getenv("LANGFUSE_SECRET_KEY"),
-            host=os.getenv("LANGFUSE_HOST", "https://cloud.langfuse.com"),
+            base_url=os.getenv("LANGFUSE_HOST") or os.getenv("LANGFUSE_BASE_URL") or "https://cloud.langfuse.com",
         )
+        _langfuse_client_initialised = True
     except Exception:
         _langfuse_client = None
+        _langfuse_client_initialised = False
     return _langfuse_client
 
 
@@ -197,21 +198,30 @@ class TriageTrace:
 
         if client:
             try:
-                trace = client.trace(
-                    # Descriptive name (skill: "names like 'chat-response', not 'trace-1'")
+                # In Langfuse v4 SDK:
+                # We start a trace by calling start_observation with as_type="span".
+                # To set trace_id, we pass trace_context with trace_id.
+                # OpenTelemetry trace IDs must be 32 lowercase hex characters.
+                # Since ticket_id is a UUID, we strip hyphens to make it a valid OTel ID.
+                otel_trace_id = ticket_id.replace("-", "") if ticket_id else None
+                trace = client.start_observation(
                     name="ticket-triage",
-                    id=ticket_id,
-                    user_id=customer_id,
-                    session_id=tenant_id,
-                    # Explicit input: only the ticket text (skill: "show only relevant data")
+                    as_type="span",
+                    trace_context={"trace_id": otel_trace_id} if otel_trace_id else None,
                     input={"ticket_text": safe_preview, "channel": channel},
                     metadata={
                         "tenant_id": tenant_id,
                         "customer_tier": customer_tier,
                         "channel": channel,
                     },
-                    tags=[customer_tier, channel],  # bounded cardinality — not tenant_id
                 )
+                
+                # Directly set the trace-level attributes on the root span object using OTel constants
+                from langfuse._client.attributes import LangfuseOtelSpanAttributes
+                if hasattr(trace, "_otel_span") and trace._otel_span is not None:
+                    trace._otel_span.set_attribute(LangfuseOtelSpanAttributes.TRACE_USER_ID, customer_id)
+                    trace._otel_span.set_attribute(LangfuseOtelSpanAttributes.TRACE_SESSION_ID, tenant_id)
+                    trace._otel_span.set_attribute(LangfuseOtelSpanAttributes.TRACE_TAGS, [customer_tier, channel])
             except Exception:
                 trace = _NoOpTrace()
 
@@ -232,25 +242,29 @@ class TriageTrace:
         """
         span = _NoOpSpan()
         start = time.time()
+
         try:
-            span = self._trace.span(
-                name=agent_name,
-                input=input_data,
-                metadata=metadata or None,
-                start_time=datetime.now(timezone.utc),
-            )
+            if hasattr(self._trace, "span"):
+                span = self._trace.span(
+                    name=agent_name,
+                    input=input_data,
+                    metadata=metadata or None,
+                    start_time=datetime.now(timezone.utc),
+                )
+            else:
+                span = _NoOpSpan()
         except Exception:
-            pass
+            span = _NoOpSpan()
 
         try:
             yield span
         finally:
             elapsed_ms = int((time.time() - start) * 1000)
             try:
-                span.end(metadata={"duration_ms": elapsed_ms})
+                if hasattr(span, "end"):
+                    span.end(metadata={"duration_ms": elapsed_ms})
             except Exception:
                 pass
-
 
     def record_generation(
         self,
@@ -281,22 +295,23 @@ class TriageTrace:
         safe_completion = _mask_pii(completion[:1000]) if completion else ""
 
         try:
-            span.generation(
-                name=f"{model}-generation",
-                model=model,
-                input=safe_messages,    # skill: "input explicitly set to relevant data"
-                output=safe_completion,
-                usage={
-                    "input": prompt_tokens,
-                    "output": completion_tokens,
-                    "total": prompt_tokens + completion_tokens,
-                    "unit": "TOKENS",
-                },
-                metadata={
-                    "latency_ms": latency_ms,
-                    "cost_usd": cost_usd,
-                },
-            )
+            if hasattr(span, "generation"):
+                span.generation(
+                    name=f"{model}-generation",
+                    model=model,
+                    input=safe_messages,    # skill: "input explicitly set to relevant data"
+                    output=safe_completion,
+                    usage={
+                        "input": prompt_tokens,
+                        "output": completion_tokens,
+                        "total": prompt_tokens + completion_tokens,
+                        "unit": "TOKENS",
+                    },
+                    metadata={
+                        "latency_ms": latency_ms,
+                        "cost_usd": cost_usd,
+                    },
+                )
         except Exception:
             pass
 
@@ -312,52 +327,56 @@ class TriageTrace:
     ) -> None:
         """Record a RAG retrieval event — not an LLM call but a vector/BM25 search."""
         try:
-            span.event(
-                name="rag_retrieval",
-                metadata={
-                    "query_preview": query[:100],
-                    "num_results": num_results,
-                    "retrieval_method": retrieval_method,
-                    "latency_ms": latency_ms,
-                    "cache_hit": cache_hit,
-                },
-            )
+            if hasattr(span, "event"):
+                span.event(
+                    name="rag_retrieval",
+                    metadata={
+                        "query_preview": query[:100],
+                        "num_results": num_results,
+                        "retrieval_method": retrieval_method,
+                        "latency_ms": latency_ms,
+                        "cache_hit": cache_hit,
+                    },
+                )
         except Exception:
             pass
 
     def score_constitutional(self, score: float, comment: str = "") -> None:
         """Attach a constitutional compliance score (0–1) to this trace."""
         try:
-            self._trace.score(
-                name="constitutional_compliance",
-                value=score,
-                comment=comment or (
-                    "All rules passed" if score >= 1.0
-                    else f"Score: {score:.2f} — some rules flagged"
-                ),
-            )
+            if hasattr(self._trace, "score"):
+                self._trace.score(
+                    name="constitutional_compliance",
+                    value=score,
+                    comment=comment or (
+                        "All rules passed" if score >= 1.0
+                        else f"Score: {score:.2f} — some rules flagged"
+                    ),
+                )
         except Exception:
             pass
 
     def score_resolution_quality(self, score: float, comment: str = "") -> None:
         """Attach a resolution quality score (0–1) — how well did RAG answer the question?"""
         try:
-            self._trace.score(
-                name="resolution_quality",
-                value=score,
-                comment=comment,
-            )
+            if hasattr(self._trace, "score"):
+                self._trace.score(
+                    name="resolution_quality",
+                    value=score,
+                    comment=comment,
+                )
         except Exception:
             pass
 
     def score_rag_grounding(self, score: float) -> None:
         """Are the KB citations in the resolution real and relevant?"""
         try:
-            self._trace.score(
-                name="rag_grounding",
-                value=score,
-                comment="Fraction of KB citations that are valid references",
-            )
+            if hasattr(self._trace, "score"):
+                self._trace.score(
+                    name="rag_grounding",
+                    value=score,
+                    comment="Fraction of KB citations that are valid references",
+                )
         except Exception:
             pass
 
@@ -377,16 +396,18 @@ class TriageTrace:
         """
         elapsed_ms = int(time.time() * 1000 - self._start_ms)
         try:
-            self._trace.update(
-                # Explicit output: the meaningful result (skill: "trace captures meaningful output")
-                output=output or {"status": status},
-                metadata={
-                    "status": status,
-                    "total_duration_ms": elapsed_ms,
-                    "total_cost_usd": total_cost_usd,
-                    "total_tokens": total_tokens,
-                },
-            )
+            if hasattr(self._trace, "update"):
+                self._trace.update(
+                    output=output or {"status": status},
+                    metadata={
+                        "status": status,
+                        "total_duration_ms": elapsed_ms,
+                        "total_cost_usd": total_cost_usd,
+                        "total_tokens": total_tokens,
+                    },
+                )
+            if hasattr(self._trace, "end"):
+                self._trace.end()
         except Exception:
             pass
         # Flush via client singleton (SDK v3 best practice)
@@ -419,6 +440,176 @@ def setup_litellm_tracing() -> bool:
         return False
 
     try:
+        # Patch langfuse.version to prevent LiteLLM v1.85.0+ import/attribute errors on SDK v4
+        try:
+            import langfuse
+            import sys
+            from types import ModuleType
+            if not hasattr(langfuse, "version"):
+                mock_ver = ModuleType("langfuse.version")
+                mock_ver.__version__ = getattr(langfuse, "__version__", "4.6.1")
+                sys.modules["langfuse.version"] = mock_ver
+                langfuse.version = mock_ver
+            
+            # Intercept Langfuse client init to strip sdk_integration parameter passed by older LiteLLM
+            if not getattr(langfuse.Langfuse.__init__, "_is_patched", False):
+                original_init = langfuse.Langfuse.__init__
+                def patched_init(self, *args, **kwargs):
+                    kwargs.pop("sdk_integration", None)
+                    original_init(self, *args, **kwargs)
+                patched_init._is_patched = True
+                langfuse.Langfuse.__init__ = patched_init
+
+            # Monkeypatch Langfuse.trace for SDK v4 back-compat with LiteLLM v1.85.0+
+            if not hasattr(langfuse.Langfuse, "trace"):
+                def mock_trace(self, **kwargs):
+                    tid = kwargs.pop("id", None)
+                    trace_context = {"trace_id": tid.replace("-", "") if (tid and "-" in tid) else tid} if tid else None
+                    name = kwargs.pop("name", "litellm-completion")
+                    inp = kwargs.pop("input", None)
+                    out = kwargs.pop("output", None)
+                    ver = kwargs.pop("version", None)
+                    metadata = kwargs.pop("metadata", {}) or {}
+                    level = kwargs.pop("level", None)
+                    status_message = kwargs.pop("status_message", None)
+                    
+                    user_id = kwargs.pop("user_id", None)
+                    session_id = kwargs.pop("session_id", None)
+                    tags = kwargs.pop("tags", None)
+                    
+                    for k in list(kwargs.keys()):
+                        metadata[k] = kwargs.pop(k)
+
+                    obs = self.start_observation(
+                        name=name,
+                        as_type="span",
+                        trace_context=trace_context,
+                        input=inp,
+                        output=out,
+                        version=ver,
+                        metadata=metadata,
+                        level=level,
+                        status_message=status_message
+                    )
+                    
+                    try:
+                        from langfuse._client.attributes import LangfuseOtelSpanAttributes
+                        if hasattr(obs, "_otel_span") and obs._otel_span is not None:
+                            if user_id:
+                                obs._otel_span.set_attribute(LangfuseOtelSpanAttributes.TRACE_USER_ID, user_id)
+                            if session_id:
+                                obs._otel_span.set_attribute(LangfuseOtelSpanAttributes.TRACE_SESSION_ID, session_id)
+                            if tags and isinstance(tags, list):
+                                obs._otel_span.set_attribute(LangfuseOtelSpanAttributes.TRACE_TAGS, tags)
+                    except Exception:
+                        pass
+                    return obs
+
+                langfuse.Langfuse.trace = mock_trace
+
+            # Monkeypatch LangfuseObservationWrapper to support legacy .span() and .generation() methods
+            import langfuse._client.span as langfuse_span
+            if not hasattr(langfuse_span.LangfuseObservationWrapper, "span"):
+                def mock_span_method(self, **kwargs):
+                    name = kwargs.pop("name", "span")
+                    inp = kwargs.pop("input", None)
+                    out = kwargs.pop("output", None)
+                    metadata = kwargs.pop("metadata", {}) or {}
+                    ver = kwargs.pop("version", None)
+                    level = kwargs.pop("level", None)
+                    status_message = kwargs.pop("status_message", None)
+                    
+                    start_time = kwargs.pop("start_time", None)
+                    end_time = kwargs.pop("end_time", None)
+                    if start_time:
+                        metadata["start_time"] = str(start_time)
+                    if end_time:
+                        metadata["end_time"] = str(end_time)
+                    
+                    for k in list(kwargs.keys()):
+                        metadata[k] = kwargs.pop(k)
+                        
+                    return self.start_observation(
+                        name=name,
+                        as_type="span",
+                        input=inp,
+                        output=out,
+                        metadata=metadata,
+                        version=ver,
+                        level=level,
+                        status_message=status_message
+                    )
+                langfuse_span.LangfuseObservationWrapper.span = mock_span_method
+
+            if not hasattr(langfuse_span.LangfuseObservationWrapper, "generation"):
+                def mock_generation_method(self, **kwargs):
+                    name = kwargs.pop("name", "generation")
+                    inp = kwargs.pop("input", None)
+                    out = kwargs.pop("output", None)
+                    metadata = kwargs.pop("metadata", {}) or {}
+                    ver = kwargs.pop("version", None)
+                    level = kwargs.pop("level", None)
+                    status_message = kwargs.pop("status_message", None)
+                    completion_start_time = kwargs.pop("completion_start_time", None)
+                    model = kwargs.pop("model", None)
+                    model_parameters = kwargs.pop("model_parameters", None)
+                    prompt = kwargs.pop("prompt", None)
+                    
+                    start_time = kwargs.pop("start_time", None)
+                    end_time = kwargs.pop("end_time", None)
+                    gen_id = kwargs.pop("id", None)
+                    if gen_id:
+                        metadata["generation_id"] = gen_id
+                    if start_time:
+                        metadata["start_time"] = str(start_time)
+                    if end_time:
+                        metadata["end_time"] = str(end_time)
+                    
+                    usage = kwargs.pop("usage", None)
+                    usage_details = kwargs.pop("usage_details", None)
+                    cost_details = kwargs.pop("cost_details", None)
+                    
+                    mapped_usage = None
+                    if usage_details:
+                        if hasattr(usage_details, "input"):
+                            mapped_usage = {
+                                "input": usage_details.input,
+                                "output": usage_details.output,
+                                "total": usage_details.total
+                            }
+                        elif isinstance(usage_details, dict):
+                            mapped_usage = usage_details
+                    elif usage:
+                        mapped_usage = {
+                            "input": usage.get("prompt_tokens", 0),
+                            "output": usage.get("completion_tokens", 0),
+                            "total": usage.get("prompt_tokens", 0) + usage.get("completion_tokens", 0)
+                        }
+                    
+                    for k in list(kwargs.keys()):
+                        metadata[k] = kwargs.pop(k)
+
+                    return self.start_observation(
+                        name=name,
+                        as_type="generation",
+                        input=inp,
+                        output=out,
+                        metadata=metadata,
+                        version=ver,
+                        level=level,
+                        status_message=status_message,
+                        completion_start_time=completion_start_time,
+                        model=model,
+                        model_parameters=model_parameters,
+                        usage_details=mapped_usage,
+                        cost_details=cost_details,
+                        prompt=prompt
+                    )
+                langfuse_span.LangfuseObservationWrapper.generation = mock_generation_method
+
+        except Exception:
+            pass
+
         import litellm
         if "langfuse" not in litellm.success_callback:
             litellm.success_callback.append("langfuse")

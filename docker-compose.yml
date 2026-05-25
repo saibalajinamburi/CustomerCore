@@ -63,10 +63,10 @@ services:
     image: docker.redpanda.com/redpandadata/console:latest
     container_name: customercore_console
     environment:
-      CONFIG_FILEPATH: /etc/redpanda/redpanda-console-config.yaml
+      CONFIG_FILEPATH: /tmp/redpanda-console-config.yaml
     entrypoint: /bin/sh
     command: >
-      -c 'printf "kafka:\n  brokers: [\"redpanda:29092\"]\n" > /etc/redpanda/redpanda-console-config.yaml && /app/console'
+      -c 'printf "kafka:\n  brokers: [\"redpanda:29092\"]\n" > /tmp/redpanda-console-config.yaml && /app/console'
     networks:
       - customercore
     ports:

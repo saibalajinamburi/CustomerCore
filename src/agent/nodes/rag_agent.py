@@ -177,7 +177,13 @@ def rag_agent_node(state: AgentState) -> AgentState:
             }
             
     except Exception as e:
-        log.error("rag_agent_llm_failed_using_fallback", error=str(e))
+        import traceback
+        resp_content = None
+        if 'clean_content' in locals():
+            resp_content = locals()['clean_content']
+        elif 'response' in locals() and hasattr(locals()['response'], 'content'):
+            resp_content = locals()['response'].content
+        log.error("rag_agent_llm_failed_using_fallback", error=str(e), traceback=traceback.format_exc(), raw_content=resp_content)
         
     # Heuristic fallback if LLM call or parsing fails
     summary = body[:150] + "..." if len(body) > 150 else body

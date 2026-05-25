@@ -143,9 +143,9 @@ async def lifespan(app: FastAPI):
 
     # Warm up LLM router (loads routing table into memory)
     try:
-        from src.rag.router import SLARouter
-        app.state.llm_router = SLARouter()
-        log.info("LLM router initialized", routing_entries=len(app.state.llm_router._table))
+        from src.rag.router import LLMRouter, ROUTING_TABLE
+        app.state.llm_router = LLMRouter()
+        log.info("LLM router initialized", routing_entries=len(ROUTING_TABLE))
     except Exception as exc:
         log.warning("LLM router init failed (non-fatal)", error=str(exc))
         app.state.llm_router = None
