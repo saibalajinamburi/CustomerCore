@@ -48,10 +48,18 @@ jobs:
         APP_ENV: "test"
       run: |
         pytest --tb=short > pytest_failure.log 2>&1 || (
+          cat pytest_failure.log
           git config --global user.email "github-actions@github.com"
           git config --global user.name "GitHub Actions"
           git add pytest_failure.log
           git commit -m "debug: add pytest failure log [skip ci]"
-          git push origin HEAD:main
+          git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }} HEAD:main
           exit 1
         )
+
+    - name: Upload Pytest Failure Log
+      if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: pytest-failure-log
+        path: pytest_failure.log
