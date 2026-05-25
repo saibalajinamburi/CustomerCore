@@ -9,9 +9,7 @@ on:
 jobs:
   lint-and-test:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    
+
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
@@ -25,17 +23,13 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        # Remove pywin32 since we run on Linux CI runner
-        sed -i '/pywin32/d' requirements.txt
-        pip install --extra-index-url https://download.pytorch.org/whl/cpu -r requirements.txt
-        pip install ruff pytest pytest-asyncio
+        pip install --extra-index-url https://download.pytorch.org/whl/cpu -r requirements-ci.txt
 
     - name: Lint with Ruff
       run: ruff check src/ tests/
 
     - name: Run Unit Tests
       env:
-        # Mock env vars so tests run in memory / sandbox
         SUPABASE_URL: "https://mock-supabase.co"
         SUPABASE_ANON_KEY: "mock-key"
         SUPABASE_SERVICE_ROLE_KEY: "mock-role-key"
@@ -47,15 +41,9 @@ jobs:
         LANGFUSE_SECRET_KEY: "mock-lf-secret"
         APP_ENV: "test"
       run: |
-        pytest --tb=short > pytest_failure.log 2>&1 || (
-          cat pytest_failure.log
-          git config --global user.email "github-actions@github.com"
-          git config --global user.name "GitHub Actions"
-          git add pytest_failure.log
-          git commit -m "debug: add pytest failure log [skip ci]"
-          git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }} HEAD:main
-          exit 1
-        )
+        set -o pipefail
+        pytest --tb=short -v 2>&1 | tee pytest_failure.log
+        exit ${PIPESTATUS[0]}
 
     - name: Upload Pytest Failure Log
       if: failure()
@@ -63,3 +51,4 @@ jobs:
       with:
         name: pytest-failure-log
         path: pytest_failure.log
+        retention-days: 5
