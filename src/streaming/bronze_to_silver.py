@@ -267,9 +267,9 @@ def main(source: str = "tickets", limit: int = None, use_vault: bool = True):
     if use_vault and _VAULT_AVAILABLE:
         from src.responsible_ai.privacy_vault import CryptographicPrivacyVault
         vault = CryptographicPrivacyVault()
-        print(f"  Privacy Vault: ENABLED (AES-256, silver_version=2.0)")
+        print("  Privacy Vault: ENABLED (AES-256, silver_version=2.0)")
     else:
-        print(f"  Privacy Vault: DISABLED (legacy Presidio masking, silver_version=1.0)")
+        print("  Privacy Vault: DISABLED (legacy Presidio masking, silver_version=1.0)")
 
     # ── 4. Clean + mask PII ───────────────────────────────────
     print(f"\n[4/5] Cleaning and masking PII in {len(all_records):,} records...")

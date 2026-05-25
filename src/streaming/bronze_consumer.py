@@ -15,7 +15,6 @@ import argparse
 import io
 import json
 import signal
-import sys
 import time
 from collections import defaultdict
 from datetime import datetime, timezone
@@ -165,7 +164,7 @@ def main(batch_size: int = 500, timeout_seconds: int = 30):
     print(f"  Parquet files  : {files_written}")
     print(f"  Duration       : {elapsed:.1f}s")
     print(f"  Sink           : s3://{BUCKET}/bronze/")
-    print(f"  Browse MinIO   : http://localhost:9001")
+    print("  Browse MinIO   : http://localhost:9001")
     print(f"{'=' * 60}")
 
 

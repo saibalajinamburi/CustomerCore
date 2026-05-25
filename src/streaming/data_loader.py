@@ -45,7 +45,7 @@ import uuid
 from datetime import datetime, timezone
 
 from confluent_kafka import Producer
-from datasets import load_dataset, concatenate_datasets
+from datasets import load_dataset
 from tqdm import tqdm
 
 # ── Config ────────────────────────────────────────────────────
@@ -286,10 +286,10 @@ def main(limit: int = None, delay: float = 0.0, sources: str = "all"):
 
     # ── 1. Download datasets ──────────────────────────────────
     print("\n[1/3] Downloading datasets from Hugging Face...")
-    t_start = time.time()
+    time.time()
     all_rows, source_counts = load_sources(sources)
 
-    print(f"\n  Source breakdown:")
+    print("\n  Source breakdown:")
     for src, count in source_counts.items():
         print(f"    {src:18s}: {count:,} rows")
     total = len(all_rows)
@@ -351,7 +351,7 @@ def main(limit: int = None, delay: float = 0.0, sources: str = "all"):
     print(f"  Duration    : {elapsed:.1f}s  ({len(all_rows)/elapsed:.0f} msg/s)")
     print(f"  Topic       : {TOPIC}")
     print(f"  Sources     : {sources}")
-    print(f"  Language breakdown:")
+    print("  Language breakdown:")
     for lang, count in sorted(lang_counts.items()):
         print(f"    {lang}: {count:,} rows")
     print(f"{'=' * 65}")

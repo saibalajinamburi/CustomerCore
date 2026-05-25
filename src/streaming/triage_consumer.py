@@ -3,7 +3,6 @@ import json
 import logging
 import os
 import signal
-import sys
 from confluent_kafka import Consumer, KafkaError
 from src.api.routers.triage import _run_triage
 from src.db.repository import TicketRepository, TicketRecord

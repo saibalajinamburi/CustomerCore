@@ -39,10 +39,8 @@ Run standalone demo:
   python -m src.responsible_ai.privacy_vault
 """
 
-import os
 import re
 import sqlite3
-import hashlib
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
@@ -438,5 +436,5 @@ if __name__ == "__main__":
     except PermissionError as e:
         print(f"  BLOCKED: {e}")
 
-    print(f"\nAudit log written to: logs/vault_audit/audit_trail.jsonl")
+    print("\nAudit log written to: logs/vault_audit/audit_trail.jsonl")
     print("=" * 60)

@@ -39,11 +39,10 @@ ROW LEVEL SECURITY:
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
 import uuid
-from uuid import UUID
 
 from supabase import AsyncClient, acreate_client
 # ─────────────────────────────────────────────────────────────────────────────
@@ -178,7 +177,6 @@ class TicketRepository:
         if self.use_in_memory or os.getenv("APP_ENV") == "test":
             return self.tenant_id
 
-        import uuid
         try:
             uuid.UUID(self.tenant_id)
             return self.tenant_id

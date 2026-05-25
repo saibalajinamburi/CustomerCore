@@ -7,7 +7,6 @@ Replaces the in-memory triage_store with TicketRepository.
 
 from __future__ import annotations
 
-import asyncio
 from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID, uuid4

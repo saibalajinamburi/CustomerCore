@@ -59,7 +59,7 @@ def setup():
         print(f"  [OK] {BUCKET}/{prefix}")
 
     print(f"\nLakehouse structure ready at MinIO: {MINIO_ENDPOINT}")
-    print(f"Browse at: http://localhost:9001 (user: minioadmin / pass: minioadmin)")
+    print("Browse at: http://localhost:9001 (user: minioadmin / pass: minioadmin)")
 
 
 if __name__ == "__main__":

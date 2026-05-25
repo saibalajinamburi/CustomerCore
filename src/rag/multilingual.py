@@ -37,7 +37,6 @@ write in French. Routing all tickets through an English-only model:
 
 import logging
 import re
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -94,7 +93,7 @@ def detect_language(text: str, min_text_length: int = 20) -> str:
         return "en"  # too short for reliable detection
 
     try:
-        from langdetect import detect, LangDetectException
+        from langdetect import detect
         lang = detect(text)
         # langdetect returns e.g. "zh-cn" — normalize to first part
         lang = lang.split("-")[0].lower()
@@ -116,7 +115,7 @@ def detect_language_with_confidence(text: str) -> tuple[str, float]:
         return "en", 1.0
 
     try:
-        from langdetect import detect_langs, LangDetectException
+        from langdetect import detect_langs
         results = detect_langs(text)
         if results:
             top = results[0]

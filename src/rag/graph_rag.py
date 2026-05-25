@@ -47,7 +47,7 @@ Run demo:
 import logging
 from collections import defaultdict
 from dataclasses import dataclass, field
-from typing import Optional, Any
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
