@@ -235,7 +235,11 @@ def create_app() -> FastAPI:
         # Security headers
         response.headers["X-Request-ID"] = request_id
         response.headers["X-Content-Type-Options"] = "nosniff"
-        response.headers["X-Frame-Options"] = "DENY"
+        
+        # Omit X-Frame-Options in Hugging Face Spaces to allow embedding in its iframe
+        if not os.getenv("SPACE_ID"):
+            response.headers["X-Frame-Options"] = "DENY"
+            
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
 
         if os.getenv("APP_ENV") == "production":
