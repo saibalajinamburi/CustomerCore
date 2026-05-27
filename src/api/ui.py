@@ -253,18 +253,42 @@ HTML_CONTENT = """<!DOCTYPE html>
             font-size: 12px;
         }
 
-        .token-display-box {
-            font-family: monospace;
+        .token-status-badge {
             font-size: 11px;
-            background: rgba(10, 14, 23, 0.7);
-            border: 1px solid var(--bg-card-border);
+            font-weight: 600;
             padding: 8px 12px;
             border-radius: 8px;
-            max-width: 180px;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-            color: var(--success);
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            border: 1px solid transparent;
+        }
+        .status-green {
+            background: rgba(16, 185, 129, 0.15);
+            color: #10b981;
+            border-color: rgba(16, 185, 129, 0.3);
+        }
+        .status-red {
+            background: rgba(239, 68, 68, 0.15);
+            color: #ef4444;
+            border-color: rgba(239, 68, 68, 0.3);
+        }
+        .btn-copy-token {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--bg-card-border);
+            color: var(--text-muted);
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .btn-copy-token:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
         }
 
         /* Demo Cases / Presets */
@@ -715,7 +739,13 @@ HTML_CONTENT = """<!DOCTYPE html>
                         <option value="admin">Administrator</option>
                     </select>
                 </div>
-                <div class="token-display-box" id="token-display" title="Token loading...">Generating...</div>
+                <div class="token-status-badge status-green" id="token-status">
+                    <span style="width: 8px; height: 8px; border-radius: 50%; background-color: currentColor; display: inline-block;"></span>
+                    <span id="token-status-text">Active (Generated)</span>
+                </div>
+                <button class="btn-copy-token" id="btn-copy-jwt" onclick="copyJWTToClipboard()" title="Copy JWT Token" style="display: none;">
+                    📋 Copy Token
+                </button>
                 <button class="btn btn-success" style="padding: 8px 14px; font-size: 12px; border-radius: 8px;" onclick="generateToken()">
                     🔄 Refresh Token
                 </button>
@@ -1061,9 +1091,23 @@ HTML_CONTENT = """<!DOCTYPE html>
             }, 3000);
         }
 
+        function copyJWTToClipboard() {
+            if (!currentToken) return;
+            navigator.clipboard.writeText(currentToken).then(() => {
+                showToast("JWT Token copied to clipboard!");
+            }).catch(err => {
+                console.error('Failed to copy token: ', err);
+                showToast("Copy failed", true);
+            });
+        }
+
         async function generateToken() {
             const tenant = document.getElementById('widget-tenant').value;
             const role = document.getElementById('widget-role').value;
+            
+            const statusBadge = document.getElementById('token-status');
+            const statusText = document.getElementById('token-status-text');
+            const copyBtn = document.getElementById('btn-copy-jwt');
             
             try {
                 const response = await fetch(`/api/v1/test-token?tenant_id=${tenant}&role=${role}`);
@@ -1073,8 +1117,9 @@ HTML_CONTENT = """<!DOCTYPE html>
                 const data = await response.json();
                 if(data.token) {
                     currentToken = data.token;
-                    document.getElementById('token-display').innerText = currentToken.slice(0, 10) + "..." + currentToken.slice(-8);
-                    document.getElementById('token-display').title = currentToken;
+                    statusBadge.className = "token-status-badge status-green";
+                    statusText.innerText = "Active (Generated)";
+                    copyBtn.style.display = "inline-flex";
                     
                     // Reload histories
                     if(document.getElementById('dashboard-view').classList.contains('active')) {
@@ -1087,7 +1132,9 @@ HTML_CONTENT = """<!DOCTYPE html>
                 }
             } catch(e) {
                 console.error("Token generation failed", e);
-                document.getElementById('token-display').innerText = "Generation failed";
+                statusBadge.className = "token-status-badge status-red";
+                statusText.innerText = "Inactive (Error)";
+                copyBtn.style.display = "none";
                 showToast("Failed to fetch test token", true);
             }
         }
@@ -1406,8 +1453,9 @@ HTML_CONTENT = """<!DOCTYPE html>
 
                 // Redpanda
                 const pandaEl = document.getElementById('health-redpanda');
-                pandaEl.innerText = data.services.redpanda ? "Active" : "Offline (Local Fallback)";
+                pandaEl.innerText = data.services.redpanda ? "Active" : "Serverless Mode (Active Fallback)";
                 pandaEl.className = data.services.redpanda ? "status-badge ok" : "status-badge info";
+                pandaEl.title = data.services.redpanda ? "Redpanda event broker is online" : "Broker is offline in serverless space; system gracefully fell back to FastAPI BackgroundTasks.";
 
                 // Supabase
                 const subaEl = document.getElementById('health-supabase');
