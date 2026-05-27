@@ -292,13 +292,14 @@ def create_app() -> FastAPI:
     @app.get("/api/v1/test-token", include_in_schema=False)
     async def get_test_token(tenant_id: str = "acme-corp", role: str = "support_agent") -> JSONResponse:
         import jwt as pyjwt
+        from src.api.auth import _get_secret_key
         payload = {
             "tenant_id": tenant_id,
             "role": role,
             "iat": int(time.time()),
             "exp": int(time.time()) + 86_400,
         }
-        secret = os.getenv("LITELLM_MASTER_KEY", "dev-key")
+        secret = _get_secret_key()
         token = pyjwt.encode(payload, secret, algorithm="HS256")
         return JSONResponse({"token": token})
 

@@ -52,7 +52,7 @@ HTML_CONTENT = """<!DOCTYPE html>
 
         /* Layout */
         .sidebar {
-            width: 320px;
+            width: 280px;
             background: rgba(10, 14, 23, 0.85);
             border-right: 1px solid var(--bg-card-border);
             padding: 24px;
@@ -67,7 +67,7 @@ HTML_CONTENT = """<!DOCTYPE html>
             flex: 1;
             padding: 40px;
             overflow-y: auto;
-            max-width: 1400px;
+            max-width: 1440px;
             margin: 0 auto;
             width: 100%;
         }
@@ -151,35 +151,174 @@ HTML_CONTENT = """<!DOCTYPE html>
             font-size: 18px;
         }
 
-        /* Token Generator Widget */
-        .token-widget {
+        /* Header Intro Card (HR / Recruiter Friendly) */
+        .info-banner {
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.12), rgba(16, 185, 129, 0.06));
+            border: 1px solid rgba(99, 102, 241, 0.25);
+            border-radius: 16px;
+            padding: 20px 24px;
+            margin-bottom: 30px;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .info-badge {
+            background: var(--primary);
+            color: white;
+            font-size: 28px;
+            width: 56px;
+            height: 56px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            box-shadow: 0 0 15px var(--primary-glow);
+        }
+
+        .info-text h3 {
+            font-family: 'Outfit', sans-serif;
+            font-size: 16px;
+            font-weight: 600;
+            color: white;
+            margin-bottom: 4px;
+        }
+
+        .info-text p {
+            font-size: 13.5px;
+            color: #d1d5db;
+            line-height: 1.5;
+        }
+
+        /* Session / Token Control Panel (Top Right Layout) */
+        .top-session-bar {
             background: var(--bg-card);
             border: 1px solid var(--bg-card-border);
             border-radius: 16px;
-            padding: 18px;
-            margin-top: auto;
+            padding: 16px 24px;
+            margin-bottom: 30px;
             display: flex;
-            flex-direction: column;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+
+        .session-info {
+            display: flex;
+            align-items: center;
             gap: 12px;
         }
 
-        .widget-title {
-            font-size: 12px;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            color: var(--text-muted);
+        .session-status {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background-color: var(--success);
+            box-shadow: 0 0 10px var(--success-glow);
+            display: inline-block;
+        }
+
+        .session-title {
+            font-size: 13px;
             font-weight: 600;
+            color: white;
         }
 
-        .select-group {
+        .session-controls {
             display: flex;
-            flex-direction: column;
-            gap: 6px;
+            align-items: center;
+            gap: 16px;
         }
 
-        .select-label {
-            font-size: 11px;
+        .control-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .control-item label {
+            font-size: 12px;
             color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        .control-item select {
+            width: 130px;
+            padding: 8px 10px;
+            background: rgba(10, 14, 23, 0.9);
+            border: 1px solid var(--bg-card-border);
+            border-radius: 8px;
+            font-size: 12px;
+        }
+
+        .token-display-box {
+            font-family: monospace;
+            font-size: 11px;
+            background: rgba(10, 14, 23, 0.7);
+            border: 1px solid var(--bg-card-border);
+            padding: 8px 12px;
+            border-radius: 8px;
+            max-width: 180px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            color: var(--success);
+        }
+
+        /* Demo Cases / Presets */
+        .demo-presets {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .preset-btn {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--bg-card-border);
+            color: #d1d5db;
+            padding: 8px 14px;
+            border-radius: 30px;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .preset-btn:hover {
+            background: rgba(99, 102, 241, 0.1);
+            border-color: var(--primary);
+            color: white;
+        }
+
+        /* Form & Result Grid */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 460px 1fr;
+            gap: 32px;
+            align-items: start;
+        }
+
+        .glass-card {
+            background: var(--bg-card);
+            border: 1px solid var(--bg-card-border);
+            border-radius: 20px;
+            padding: 28px;
+            backdrop-filter: var(--glass-backdrop);
+        }
+
+        .form-group {
+            margin-bottom: 18px;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-muted);
+            margin-bottom: 8px;
         }
 
         select, input, textarea {
@@ -227,20 +366,6 @@ HTML_CONTENT = """<!DOCTYPE html>
             box-shadow: 0 0 15px var(--success-glow);
         }
 
-        .token-badge {
-            background: rgba(16, 185, 129, 0.1);
-            color: var(--success);
-            padding: 6px 10px;
-            border-radius: 6px;
-            font-size: 10px;
-            font-family: monospace;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-            overflow: hidden;
-            text-align: center;
-            border: 1px solid rgba(16, 185, 129, 0.2);
-        }
-
         /* Dashboard View Elements */
         .tab-view {
             display: none;
@@ -257,7 +382,7 @@ HTML_CONTENT = """<!DOCTYPE html>
         }
 
         .view-header {
-            margin-bottom: 32px;
+            margin-bottom: 24px;
         }
 
         .view-header h2 {
@@ -273,34 +398,6 @@ HTML_CONTENT = """<!DOCTYPE html>
             font-size: 14px;
         }
 
-        /* Form & Result Grid */
-        .dashboard-grid {
-            display: grid;
-            grid-template-columns: 420px 1fr;
-            gap: 32px;
-            align-items: start;
-        }
-
-        .glass-card {
-            background: var(--bg-card);
-            border: 1px solid var(--bg-card-border);
-            border-radius: 20px;
-            padding: 28px;
-            backdrop-filter: var(--glass-backdrop);
-        }
-
-        .form-group {
-            margin-bottom: 20px;
-        }
-
-        .form-group label {
-            display: block;
-            font-size: 13px;
-            font-weight: 500;
-            color: var(--text-muted);
-            margin-bottom: 8px;
-        }
-
         /* Analytics Output Panel */
         .analytics-panel {
             display: flex;
@@ -310,7 +407,7 @@ HTML_CONTENT = """<!DOCTYPE html>
 
         .analytics-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
             gap: 20px;
         }
 
@@ -499,6 +596,7 @@ HTML_CONTENT = """<!DOCTYPE html>
         }
         .status-badge.ok { background: rgba(16, 185, 129, 0.15); color: var(--success); }
         .status-badge.error { background: rgba(239, 68, 68, 0.15); color: var(--danger); }
+        .status-badge.info { background: rgba(99, 102, 241, 0.15); color: var(--primary); }
 
         .pulse-dot {
             width: 8px;
@@ -566,30 +664,9 @@ HTML_CONTENT = """<!DOCTYPE html>
             </div>
         </div>
 
-        <!-- Token Generator Widget -->
-        <div class="token-widget">
-            <h3 class="widget-title">Mock Tenant JWT</h3>
-            <div class="select-group">
-                <label class="select-label">Tenant ID</label>
-                <select id="widget-tenant" onchange="generateToken()">
-                    <option value="acme-corp">acme-corp (Tenant A)</option>
-                    <option value="globex">globex (Tenant B)</option>
-                    <option value="hooli">hooli (Tenant C)</option>
-                    <option value="test-tenant" selected>test-tenant</option>
-                </select>
-            </div>
-            <div class="select-group">
-                <label class="select-label">Role</label>
-                <select id="widget-role" onchange="generateToken()">
-                    <option value="support_agent" selected>Support Agent</option>
-                    <option value="manager">Manager</option>
-                    <option value="admin">Administrator</option>
-                </select>
-            </div>
-            <div class="token-badge" id="token-display">Generating token...</div>
-            <button class="btn btn-success" style="padding: 10px;" onclick="generateToken()">
-                🔄 Regenerate Token
-            </button>
+        <div style="margin-top: auto; font-size: 11px; color: var(--text-muted); border-top: 1px solid var(--bg-card-border); padding-top: 16px; text-align: center;">
+            Version 1.0.0 (FastAPI Core)<br>
+            <a href="/docs" target="_blank" style="color: var(--primary); text-decoration: none; font-weight: 600;">Swagger API Docs ↗</a>
         </div>
     </div>
 
@@ -602,41 +679,96 @@ HTML_CONTENT = """<!DOCTYPE html>
             <span id="toast-message">Notification message</span>
         </div>
 
+        <!-- HR / RECRUITER EXPLANATION BANNER -->
+        <div class="info-banner">
+            <div class="info-badge">🚀</div>
+            <div class="info-text">
+                <h3>B2B AI Customer Intelligence Platform & Triage Engine</h3>
+                <p>
+                    CustomerCore uses a stateful <strong>LangGraph supervisor network</strong> of 6 specialized AI agents to process customer support tickets. 
+                    The pipeline classifies urgency, routes to departments, masks sensitive PII (EU AI Act privacy compliance), predicts churn risk, detects systemic outage anomalies, and automatically generates resolution responses.
+                </p>
+            </div>
+        </div>
+
+        <!-- SESSION / AUTHENTICATION CONTROL BAR (REPLACED FROM SIDEBAR) -->
+        <div class="top-session-bar">
+            <div class="session-info">
+                <span class="session-status"></span>
+                <span class="session-title">Active Session Context</span>
+            </div>
+            <div class="session-controls">
+                <div class="control-item">
+                    <label>Tenant Scope</label>
+                    <select id="widget-tenant" onchange="generateToken()">
+                        <option value="acme-corp" selected>acme-corp (Tenant A)</option>
+                        <option value="globex">globex (Tenant B)</option>
+                        <option value="hooli">hooli (Tenant C)</option>
+                        <option value="test-tenant">test-tenant</option>
+                    </select>
+                </div>
+                <div class="control-item">
+                    <label>Operator Role</label>
+                    <select id="widget-role" onchange="generateToken()">
+                        <option value="support_agent">Support Agent</option>
+                        <option value="manager" selected>Manager (HITL access)</option>
+                        <option value="admin">Administrator</option>
+                    </select>
+                </div>
+                <div class="token-display-box" id="token-display" title="Token loading...">Generating...</div>
+                <button class="btn btn-success" style="padding: 8px 14px; font-size: 12px; border-radius: 8px;" onclick="generateToken()">
+                    🔄 Refresh Token
+                </button>
+            </div>
+        </div>
+
         <!-- TAB 1: TRIAGE DASHBOARD -->
         <div id="dashboard-view" class="tab-view active">
             <div class="view-header">
-                <h2>AI Triage Dashboard</h2>
-                <p>Submit mock support tickets to the streaming analytics & classification pipeline</p>
+                <h2>AI Triage Pipeline</h2>
+                <p>Test the end-to-end streaming classification and guardrail compliance pipeline</p>
+            </div>
+
+            <!-- Demo Presets (1-Click case loaders) -->
+            <div style="margin-bottom: 12px; font-size: 12px; color: var(--text-muted); font-weight: 600;">1-CLICK DEMO CASES (QUICK TESTS):</div>
+            <div class="demo-presets">
+                <button class="preset-btn" onclick="loadPreset('billing')">💳 Billing Escalation (High Churn Risk)</button>
+                <button class="preset-btn" onclick="loadPreset('outage')">🚨 Server Outage Anomaly (Critical Priority)</button>
+                <button class="preset-btn" onclick="loadPreset('privacy')">🔒 PII Leak / Safety Violation (Blocked & HITL Gated)</button>
             </div>
 
             <div class="dashboard-grid">
                 <!-- Left column: Submit Ticket Form -->
                 <div class="glass-card">
-                    <h3 style="margin-bottom: 20px; font-size: 18px; font-family: 'Outfit';">Submit New Ticket</h3>
+                    <h3 style="margin-bottom: 20px; font-size: 18px; font-family: 'Outfit';">Submit Support Ticket</h3>
                     <form id="triage-form" onsubmit="submitTriage(event)">
                         <div class="form-group">
                             <label>Customer ID</label>
-                            <input type="text" id="cust-id" value="cust_998" placeholder="e.g. cust_001" required>
+                            <input type="text" id="cust-id" value="cust_billing_01" required>
                         </div>
                         <div class="form-group">
                             <label>Customer Tier</label>
                             <select id="cust-tier">
-                                <option value="standard">Standard Tier</option>
-                                <option value="gold">Gold Tier</option>
+                                <option value="free">Free Tier</option>
+                                <option value="starter">Starter Tier</option>
+                                <option value="growth">Growth Tier</option>
                                 <option value="enterprise" selected>Enterprise Tier</option>
+                                <option value="vip">VIP Tier</option>
                             </select>
                         </div>
                         <div class="form-group">
                             <label>Source / Channel</label>
                             <select id="ticket-channel">
-                                <option value="email" selected>Email Interface</option>
-                                <option value="web_portal">Web Customer Portal</option>
-                                <option value="api_gateway">API Gateway Client</option>
+                                <option value="email" selected>Email</option>
+                                <option value="console">Operations Console</option>
+                                <option value="api">API Gateway</option>
+                                <option value="slack">Slack</option>
+                                <option value="webhook">Webhook</option>
                             </select>
                         </div>
                         <div class="form-group">
-                            <label>Support Ticket Text (e.g. Billing, Outage, Complaint)</label>
-                            <textarea id="ticket-text" rows="8" placeholder="Write the support issue text (minimum 10 characters)..." required>We are experiencing a major billing bug. My payment method was charged twice ($500) and the API is returning 500 errors. Please refund our money immediately or we will cancel our subscription.</textarea>
+                            <label>Support Ticket Text</label>
+                            <textarea id="ticket-text" rows="7" required>Write the support issue here...</textarea>
                         </div>
                         <button type="submit" class="btn" style="width: 100%;" id="submit-btn">
                             🚀 Dispatch to Triage Pipeline
@@ -697,21 +829,21 @@ HTML_CONTENT = """<!DOCTYPE html>
 
                     <!-- AI Suggested Resolution -->
                     <div class="large-metric-card">
-                        <h4 style="margin-bottom: 12px; font-size: 14px; text-transform: uppercase; color: var(--text-muted); font-weight: 600;">
+                        <h4 style="margin-bottom: 12px; font-size: 13px; text-transform: uppercase; color: var(--text-muted); font-weight: 600; letter-spacing: 0.5px;">
                             Suggested Agent Resolution
                         </h4>
                         <div id="metric-resolution" style="font-size: 14px; line-height: 1.6; color: #e5e7eb; min-height: 50px;">
-                            Submit a ticket to view the AI-generated resolution draft here.
+                            Load a preset or write a ticket to see the AI agent's processed output here.
                         </div>
                     </div>
 
                     <!-- PII Redaction Log -->
                     <div class="large-metric-card">
-                        <h4 style="margin-bottom: 12px; font-size: 14px; text-transform: uppercase; color: var(--text-muted); font-weight: 600;">
-                            Privacy Vault (PII Masking Audit)
+                        <h4 style="margin-bottom: 12px; font-size: 13px; text-transform: uppercase; color: var(--text-muted); font-weight: 600; letter-spacing: 0.5px;">
+                            Privacy Vault (PII Masking Audit Log)
                         </h4>
                         <div class="log-box" id="metric-pii-log">
-                            Audit logs will populate once the ticket is processed.
+                            Audit logs will display once a ticket is evaluated.
                         </div>
                     </div>
                 </div>
@@ -728,7 +860,7 @@ HTML_CONTENT = """<!DOCTYPE html>
                         <thead>
                             <tr>
                                 <th>Ticket ID</th>
-                                <th>Customer</th>
+                                <th>Customer ID</th>
                                 <th>Tier</th>
                                 <th>Priority</th>
                                 <th>Status</th>
@@ -738,7 +870,7 @@ HTML_CONTENT = """<!DOCTYPE html>
                         </thead>
                         <tbody id="history-table-body">
                             <tr>
-                                <td colspan="7" class="empty-state">No tickets triaged yet. Submit a ticket above!</td>
+                                <td colspan="7" class="empty-state">No tickets triaged yet. Load a preset above!</td>
                             </tr>
                         </tbody>
                     </table>
@@ -750,7 +882,7 @@ HTML_CONTENT = """<!DOCTYPE html>
         <div id="hitl-view" class="tab-view">
             <div class="view-header">
                 <h2>Human-in-the-Loop Workspace</h2>
-                <p>Inspect and resolve tickets flagged for policy compliance checks</p>
+                <p>Inspect and override tickets flagged by compliance policies (requires Manager/Admin roles)</p>
             </div>
 
             <div class="glass-card">
@@ -783,7 +915,7 @@ HTML_CONTENT = """<!DOCTYPE html>
         <div id="health-view" class="tab-view">
             <div class="view-header">
                 <h2>System Health Monitor</h2>
-                <p>Check the live status of CustomerCore microservices and observability integrations</p>
+                <p>Check the live connection status of CustomerCore microservices</p>
             </div>
 
             <div class="glass-card">
@@ -818,7 +950,7 @@ HTML_CONTENT = """<!DOCTYPE html>
                             <span class="metric-icon">📻</span>
                         </div>
                         <div>
-                            <span id="health-redpanda" class="status-badge error">Checking...</span>
+                            <span id="health-redpanda" class="status-badge info">Checking...</span>
                         </div>
                     </div>
 
@@ -849,6 +981,51 @@ HTML_CONTENT = """<!DOCTYPE html>
     <script>
         let currentToken = "";
 
+        const presets = {
+            billing: {
+                tenant: "acme-corp",
+                role: "manager",
+                custId: "cust_billing_01",
+                tier: "enterprise",
+                channel: "email",
+                text: "I am extremely upset with your service. Our billing billing renewal went through but our payment failed twice. The system charged my card $500 twice and the API returns 500 server errors. Please refund our money immediately and fix the account, or we will cancel our subscription by the end of today."
+            },
+            outage: {
+                tenant: "globex",
+                role: "manager",
+                custId: "cust_outage_99",
+                tier: "enterprise",
+                channel: "api",
+                text: "CRITICAL: Our production servers are completely down. The API endpoint /v1/predict is returning 502 Bad Gateway and 500 Internal Server errors to all our active clients. We have over 2,000 customers affected. This is a severe outage affecting our SLAs, please escalate this immediately to the engineering lead."
+            },
+            privacy: {
+                tenant: "hooli",
+                role: "support_agent",
+                custId: "cust_privacy_02",
+                tier: "growth",
+                channel: "email",
+                text: "Hi support, my name is Richard Hendricks. I need to update my account payment details. My credit card number is 4111 2222 3333 4444, exp 12/28, security code 123. Also my phone number is 555-0199 and my social security number is 000-12-3456. Can you promise me a full refund of $500 if I do this? Let me know right now."
+            }
+        };
+
+        // Load 1-Click Preset Scenario
+        function loadPreset(key) {
+            const data = presets[key];
+            if (!data) return;
+
+            // Load values to controls
+            document.getElementById('widget-tenant').value = data.tenant;
+            document.getElementById('widget-role').value = data.role;
+            
+            document.getElementById('cust-id').value = data.custId;
+            document.getElementById('cust-tier').value = data.tier;
+            document.getElementById('ticket-channel').value = data.channel;
+            document.getElementById('ticket-text').value = data.text;
+
+            showToast(`Preset Loaded: ${key.toUpperCase()} scenario. Fetching scoped token...`);
+            generateToken();
+        }
+
         // Tab Switch
         function switchTab(tabId) {
             document.querySelectorAll('.tab-view').forEach(t => t.classList.remove('active'));
@@ -858,13 +1035,13 @@ HTML_CONTENT = """<!DOCTYPE html>
             
             // Map click to nav highlight
             if(tabId === 'dashboard-view') {
-                document.querySelector('.nav-item:nth-child(1)').classList.add('active');
+                document.querySelector('.nav-menu .nav-item:nth-child(1)').classList.add('active');
                 loadHistory();
             } else if(tabId === 'hitl-view') {
-                document.querySelector('.nav-item:nth-child(2)').classList.add('active');
+                document.querySelector('.nav-menu .nav-item:nth-child(2)').classList.add('active');
                 loadHITLList();
             } else if(tabId === 'health-view') {
-                document.querySelector('.nav-item:nth-child(3)').classList.add('active');
+                document.querySelector('.nav-menu .nav-item:nth-child(3)').classList.add('active');
                 checkSystemHealth();
             }
         }
@@ -894,13 +1071,14 @@ HTML_CONTENT = """<!DOCTYPE html>
                 const data = await response.json();
                 if(data.token) {
                     currentToken = data.token;
-                    document.getElementById('token-display').innerText = currentToken.slice(0, 15) + "..." + currentToken.slice(-10);
+                    document.getElementById('token-display').innerText = currentToken.slice(0, 10) + "..." + currentToken.slice(-8);
                     document.getElementById('token-display').title = currentToken;
-                    showToast(`Token generated for ${tenant} (${role})`);
                     
                     // Reload histories
                     if(document.getElementById('dashboard-view').classList.contains('active')) {
                         loadHistory();
+                    } else if(document.getElementById('hitl-view').classList.contains('active')) {
+                        loadHITLList();
                     }
                 }
             } catch(e) {
@@ -954,8 +1132,6 @@ HTML_CONTENT = """<!DOCTYPE html>
 
                 const result = await response.json();
                 showToast("Ticket submitted to triage pipeline!");
-                
-                // Since this is a 202 Accepted response, we need to poll the ticket status until it is finished.
                 pollTicketStatus(result.ticket_id);
             } catch(e) {
                 console.error("Submit failed", e);
@@ -982,7 +1158,6 @@ HTML_CONTENT = """<!DOCTYPE html>
                     });
 
                     if(response.status === 404) {
-                        // Not found yet / waiting
                         return;
                     }
 
@@ -992,7 +1167,6 @@ HTML_CONTENT = """<!DOCTYPE html>
 
                     const data = await response.json();
                     
-                    // If finished or failed, display results
                     if(data.status !== "pending" || attempts >= maxAttempts) {
                         clearInterval(pollInterval);
                         displayTriageResults(data);
@@ -1050,7 +1224,6 @@ HTML_CONTENT = """<!DOCTYPE html>
                 safetyEl.className = "safety-banner safety-blocked";
                 safetyText.innerText = "🛡️ AI Compliance Check: BLOCKED! Input/Output policy violations detected.";
                 
-                // Show violations in PII log
                 if (data.constitutional_violations && data.constitutional_violations.length > 0) {
                     piiText += `\n[Safety Violations Detected]\n`;
                     data.constitutional_violations.forEach(v => {
@@ -1082,7 +1255,7 @@ HTML_CONTENT = """<!DOCTYPE html>
 
                 const tickets = await response.json();
                 if(tickets.length === 0) {
-                    tbody.innerHTML = `<tr><td colspan="7" class="empty-state">No tickets triaged yet. Submit a ticket above!</td></tr>`;
+                    tbody.innerHTML = `<tr><td colspan="7" class="empty-state">No tickets triaged yet. Load a preset above!</td></tr>`;
                     return;
                 }
 
@@ -1090,14 +1263,13 @@ HTML_CONTENT = """<!DOCTYPE html>
                 tickets.forEach(t => {
                     const tr = document.createElement('tr');
                     const priorityClass = t.priority ? t.priority.toLowerCase() : 'low';
-                    const statusClass = t.status === 'hitl' ? 'warning' : (t.status === 'completed' ? 'success' : 'muted');
                     
                     tr.innerHTML = `
                         <td style="font-family: monospace;">${t.ticket_id.slice(0, 8)}...</td>
                         <td>${t.customer_id}</td>
                         <td><span style="text-transform: capitalize;">${t.customer_tier}</span></td>
                         <td><span class="priority-badge priority-${priorityClass}">${t.priority || 'Low'}</span></td>
-                        <td><span class="status-badge" style="padding: 2px 8px; font-size: 11px;">${t.status}</span></td>
+                        <td><span class="status-badge info" style="padding: 2px 8px; font-size: 11px;">${t.status}</span></td>
                         <td>${new Date(t.created_at || Date.now()).toLocaleString()}</td>
                         <td>
                             <button class="btn" style="padding: 4px 8px; font-size: 11px;" onclick="loadSingleTicket('${t.ticket_id}')">👁️ View</button>
@@ -1107,7 +1279,7 @@ HTML_CONTENT = """<!DOCTYPE html>
                 });
             } catch(e) {
                 console.error("Load history failed", e);
-                tbody.innerHTML = `<tr><td colspan="7" class="empty-state">Failed to load ticket history. Please ensure a valid token is loaded.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="7" class="empty-state">Failed to load ticket history. Ensure active tenant matches context.</td></tr>`;
             }
         }
 
@@ -1134,7 +1306,6 @@ HTML_CONTENT = """<!DOCTYPE html>
             const tbody = document.getElementById('hitl-table-body');
             
             try {
-                // Fetch all tickets for the active tenant, and filter by status === 'hitl'
                 const response = await fetch('/api/v1/triage', {
                     headers: {
                         'Authorization': `Bearer ${currentToken}`
@@ -1158,10 +1329,9 @@ HTML_CONTENT = """<!DOCTYPE html>
                     const tr = document.createElement('tr');
                     const textSnip = t.masked_text ? (t.masked_text.slice(0, 50) + "...") : (t.text.slice(0, 50) + "...");
                     
-                    // Show custom mock violations since we don't have DB populated
                     const violations = t.constitutional_violations && t.constitutional_violations.length > 0 
                         ? t.constitutional_violations.map(v => `${v.rule_id}: ${v.reason}`).join(", ")
-                        : "PII masking/Policy warning";
+                        : "PII protection warning / Policy trigger";
 
                     tr.innerHTML = `
                         <td style="font-family: monospace;">${t.ticket_id.slice(0, 8)}...</td>
@@ -1184,7 +1354,7 @@ HTML_CONTENT = """<!DOCTYPE html>
         async function resumeHITLTicket(ticketId) {
             const operatorId = prompt("Enter operator ID (e.g. operator_12):", "op_manager_01");
             if(!operatorId) return;
-            const resolution = prompt("Enter manual override resolution text:", "Manual Override: Refund issued and payment method updated.");
+            const resolution = prompt("Enter manual override resolution text:", "Manual Override: Resolved and updated details.");
             if(!resolution) return;
 
             try {
@@ -1221,7 +1391,6 @@ HTML_CONTENT = """<!DOCTYPE html>
 
         // Check system health
         async function checkSystemHealth() {
-            // Fetch live readiness state
             try {
                 const response = await fetch('/api/v1/ready');
                 const data = await response.json();
@@ -1233,8 +1402,8 @@ HTML_CONTENT = """<!DOCTYPE html>
 
                 // Redpanda
                 const pandaEl = document.getElementById('health-redpanda');
-                pandaEl.innerText = data.services.redpanda ? "Connected" : "Offline";
-                pandaEl.className = data.services.redpanda ? "status-badge ok" : "status-badge error";
+                pandaEl.innerText = data.services.redpanda ? "Active" : "Offline (Local Fallback)";
+                pandaEl.className = data.services.redpanda ? "status-badge ok" : "status-badge info";
 
                 // Supabase
                 const subaEl = document.getElementById('health-supabase');
@@ -1242,12 +1411,12 @@ HTML_CONTENT = """<!DOCTYPE html>
                 subaEl.className = data.services.supabase ? "status-badge ok" : "status-badge error";
 
                 // Config log
-                let configText = `[CustomerCore Microservice Configuration]\n`;
-                configText += `- App Environment: production\n`;
-                configText += `- Database Provider: Supabase (RLS isolated)\n`;
-                configText += `- Cache Store: Redis Cache (Rate limits + L1 cache)\n`;
-                configText += `- Message Broker: Redpanda (Kafka v2 compatible)\n`;
-                configText += `- Graph-RAG Search: ChromaDB (Vector) + BM25 (Keyword)\n`;
+                let configText = `[CustomerCore Microservice Configuration Settings]\n`;
+                configText += `- Active Environment: production\n`;
+                configText += `- Database Stack: Supabase PostgreSQL (Row-Level Security active)\n`;
+                configText += `- Caching: Redis Cache Store (Rate limits + L1 cache active)\n`;
+                configText += `- Streaming Message Queue: Redpanda (Offline in cloud space, auto falling back to in-process async background tasks)\n`;
+                configText += `- Multi-tenant Hybrid RAG: ChromaDB (Vector Search) + BM25 (Keyword Search) + Reciprocal Rank Fusion\n`;
                 document.getElementById('health-config-log').innerText = configText;
             } catch(e) {
                 showToast("Failed to fetch service health", true);
@@ -1256,7 +1425,7 @@ HTML_CONTENT = """<!DOCTYPE html>
 
         // Initialize Page
         window.addEventListener('DOMContentLoaded', () => {
-            generateToken();
+            loadPreset('billing');
         });
     </script>
 </body>
