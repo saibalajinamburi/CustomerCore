@@ -42,6 +42,15 @@ jobs:
       run: |
         python src/ml/train_churn.py
 
+    - name: Push data to DagsHub (DVC)
+      env:
+        DAGSHUB_USER_TOKEN: ${{ secrets.DAGSHUB_TOKEN }}
+      run: |
+        # Use token to authenticate DVC push to DagsHub remote storage
+        dvc remote modify --local origin password $DAGSHUB_USER_TOKEN
+        dvc push
+        echo "✅ Dataset pushed to DagsHub DVC remote."
+
     - name: Write CML Report
       env:
         REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -87,3 +96,4 @@ jobs:
         
         # Create comment on Commit/PR
         cml comment create report.md
+
