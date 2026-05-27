@@ -290,7 +290,10 @@ def create_app() -> FastAPI:
 
     # ── Root redirect to docs ───────────────────────────────────────────────
     @app.get("/", include_in_schema=False)
-    async def root() -> JSONResponse:
+    async def root() -> Response:
+        if os.getenv("SPACE_ID"):
+            from fastapi.responses import RedirectResponse
+            return RedirectResponse(url="/docs")
         return JSONResponse({
             "name": "CustomerCore API",
             "version": "1.0.0",

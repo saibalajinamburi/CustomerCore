@@ -5,11 +5,14 @@ import duckdb
 def init_mock_duckdb():
     db_path = "src/dbt/customercore.duckdb"
     if os.path.exists(db_path):
+        print(f"[CI/CD Setup] Using existing DuckDB database at: {db_path}")
         return
     
+    print(f"[CI/CD Setup] Creating mock DuckDB database file at: {db_path}...")
     os.makedirs(os.path.dirname(db_path), exist_ok=True)
     conn = duckdb.connect(db_path)
     
+    print("[CI/CD Setup] Creating schema 'gold_gold'...")
     conn.execute("CREATE SCHEMA IF NOT EXISTS gold_gold")
     
     # customer_health_daily
@@ -123,6 +126,7 @@ def init_mock_duckdb():
         ('tenant1', 'email', '2026-05-27 12:00:00', 'high', 10, 8, 120.5)
     """)
     
+    print("[CI/CD Setup] Mock DuckDB database created successfully.")
     conn.close()
 
 # Run initialization before tests run
