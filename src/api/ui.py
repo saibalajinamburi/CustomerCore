@@ -1061,13 +1061,15 @@ HTML_CONTENT = """<!DOCTYPE html>
             }, 3000);
         }
 
-        // Generate Token on Page Load / widget selection
         async function generateToken() {
             const tenant = document.getElementById('widget-tenant').value;
             const role = document.getElementById('widget-role').value;
             
             try {
                 const response = await fetch(`/api/v1/test-token?tenant_id=${tenant}&role=${role}`);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
                 const data = await response.json();
                 if(data.token) {
                     currentToken = data.token;
@@ -1080,6 +1082,8 @@ HTML_CONTENT = """<!DOCTYPE html>
                     } else if(document.getElementById('hitl-view').classList.contains('active')) {
                         loadHITLList();
                     }
+                } else {
+                    throw new Error("No token returned by API");
                 }
             } catch(e) {
                 console.error("Token generation failed", e);
