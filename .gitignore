@@ -15,7 +15,9 @@ __pycache__/
 *.pem
 
 # Data and databases
-data/
+data/*
+!data/*.dvc
+!data/.gitignore
 *.duckdb
 *.db
 mlruns.db

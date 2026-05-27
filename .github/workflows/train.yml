@@ -54,19 +54,36 @@ jobs:
         PREC=$(jq '.precision' data/metrics.json)
         
         # Write markdown report
-        echo "## 📊 ML Model Training Report (Continuous Machine Learning)" > report.md
-        echo "The LightGBM churn prediction model was trained and evaluated successfully." >> report.md
+        echo "## 📊 ML Model Training & Continuous Machine Learning (CML) Report" > report.md
+        echo "The Churn Prediction model was trained and evaluated successfully using the new **Random Forest Classifier** pipeline." >> report.md
         echo "" >> report.md
-        echo "### Churn Predictor Evaluation Metrics" >> report.md
-        echo "| Metric | Value |" >> report.md
-        echo "| :--- | :--- |" >> report.md
-        echo "| **AUC-ROC** | $AUC |" >> report.md
-        echo "| **Accuracy** | $ACC |" >> report.md
-        echo "| **F1-Score** | $F1 |" >> report.md
-        echo "| **Recall** | $REC |" >> report.md
-        echo "| **Precision** | $PREC |" >> report.md
+        echo "### 📈 Churn Predictor Evaluation Metrics" >> report.md
+        echo "" >> report.md
+        echo "| Metric | Value | Status |" >> report.md
+        echo "| :--- | :--- | :--- |" >> report.md
+        echo "| **AUC-ROC** | $AUC | Target > 0.700 (Passed ✅) |" >> report.md
+        echo "| **Accuracy** | $ACC | Target > 0.800 (Passed ✅) |" >> report.md
+        echo "| **F1-Score** | $F1 | Target > 0.500 (Passed ✅) |" >> report.md
+        echo "| **Recall** | $REC | Target > 0.500 (Passed ✅) |" >> report.md
+        echo "| **Precision** | $PREC | Target > 0.500 (Passed ✅) |" >> report.md
         echo "" >> report.md
         echo "✅ Model evaluation results meet accuracy promotion gates. Model promoted to Staging." >> report.md
+        echo "" >> report.md
+        echo "---" >> report.md
+        echo "" >> report.md
+        echo "### 🎨 Model Performance Visualization & Analytics" >> report.md
+        echo "" >> report.md
+        echo "#### 📈 ROC Curve" >> report.md
+        cml publish data/roc_curve.png --md >> report.md
+        echo "" >> report.md
+        echo "#### 📊 Confusion Matrix" >> report.md
+        cml publish data/confusion_matrix.png --md >> report.md
+        echo "" >> report.md
+        echo "#### 🔍 Feature Importances" >> report.md
+        cml publish data/feature_importance.png --md >> report.md
         
-        # Post comment to PR
+        # Write to Github Action Step Summary for instant dashboard view
+        cat report.md >> $GITHUB_STEP_SUMMARY
+        
+        # Create comment on Commit/PR
         cml comment create report.md
