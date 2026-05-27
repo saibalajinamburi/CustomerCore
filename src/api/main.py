@@ -288,12 +288,30 @@ def create_app() -> FastAPI:
     app.include_router(stream.router)
     app.include_router(metrics.router)
 
+    # ── Test Token endpoint (for UI workspace) ────────────────────────────────
+    @app.get("/api/v1/test-token", include_in_schema=False)
+    async def get_test_token(tenant_id: str = "acme-corp", role: str = "support_agent") -> JSONResponse:
+        import jwt as pyjwt
+        payload = {
+            "tenant_id": tenant_id,
+            "role": role,
+            "iat": int(time.time()),
+            "exp": int(time.time()) + 86_400,
+        }
+        secret = os.getenv("LITELLM_MASTER_KEY", "dev-key")
+        token = pyjwt.encode(payload, secret, algorithm="HS256")
+        return JSONResponse({"token": token})
+
     # ── Root redirect to docs ───────────────────────────────────────────────
     @app.get("/", include_in_schema=False)
-    async def root() -> Response:
-        if os.getenv("SPACE_ID"):
-            from fastapi.responses import RedirectResponse
-            return RedirectResponse(url="/docs")
+    async def root(request: Request) -> Response:
+        accept = request.headers.get("accept", "")
+        # Serve the premium UI console to browsers or when running in HF Spaces
+        if "text/html" in accept or os.getenv("SPACE_ID"):
+            from fastapi.responses import HTMLResponse
+            from src.api.ui import HTML_CONTENT
+            return HTMLResponse(content=HTML_CONTENT)
+            
         return JSONResponse({
             "name": "CustomerCore API",
             "version": "1.0.0",
