@@ -245,50 +245,53 @@ HTML_CONTENT = """<!DOCTYPE html>
         }
 
         .control-item select {
-            width: 130px;
-            padding: 8px 10px;
+            width: auto;
+            min-width: 140px;
+            max-width: 260px;
+            padding: 8px 28px 8px 12px;
             background: rgba(10, 14, 23, 0.9);
             border: 1px solid var(--bg-card-border);
             border-radius: 8px;
             font-size: 12px;
+            color: var(--text-main);
+            appearance: none;
+            -webkit-appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%239ca3af'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 10px center;
+            cursor: pointer;
+            transition: border-color 0.2s ease;
         }
 
-        .token-status-badge {
+        .control-item select:hover {
+            border-color: rgba(99, 102, 241, 0.4);
+        }
+
+        .control-item select:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.15);
+        }
+
+        .auth-status {
             font-size: 11px;
             font-weight: 600;
-            padding: 8px 12px;
-            border-radius: 8px;
+            padding: 6px 14px;
+            border-radius: 20px;
             display: inline-flex;
             align-items: center;
             gap: 6px;
-            border: 1px solid transparent;
+            transition: all 0.3s ease;
         }
-        .status-green {
-            background: rgba(16, 185, 129, 0.15);
+        .auth-ok {
+            background: rgba(16, 185, 129, 0.12);
             color: #10b981;
-            border-color: rgba(16, 185, 129, 0.3);
+            border: 1px solid rgba(16, 185, 129, 0.25);
         }
-        .status-red {
-            background: rgba(239, 68, 68, 0.15);
+        .auth-fail {
+            background: rgba(239, 68, 68, 0.12);
             color: #ef4444;
-            border-color: rgba(239, 68, 68, 0.3);
-        }
-        .btn-copy-token {
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid var(--bg-card-border);
-            color: var(--text-muted);
-            padding: 8px 12px;
-            border-radius: 8px;
-            font-size: 11px;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-        }
-        .btn-copy-token:hover {
-            background: rgba(255, 255, 255, 0.1);
-            color: white;
+            border: 1px solid rgba(239, 68, 68, 0.25);
         }
 
         /* Demo Cases / Presets */
@@ -715,40 +718,34 @@ HTML_CONTENT = """<!DOCTYPE html>
             </div>
         </div>
 
-        <!-- SESSION / AUTHENTICATION CONTROL BAR (REPLACED FROM SIDEBAR) -->
+        <!-- SESSION / AUTHENTICATION CONTROL BAR -->
         <div class="top-session-bar">
             <div class="session-info">
-                <span class="session-status"></span>
+                <span class="session-status" id="session-dot"></span>
                 <span class="session-title">Active Session Context</span>
             </div>
             <div class="session-controls">
                 <div class="control-item">
-                    <label>Tenant Scope</label>
+                    <label>Tenant</label>
                     <select id="widget-tenant" onchange="generateToken()">
-                        <option value="acme-corp" selected>acme-corp (Tenant A)</option>
-                        <option value="globex">globex (Tenant B)</option>
-                        <option value="hooli">hooli (Tenant C)</option>
-                        <option value="test-tenant">test-tenant</option>
+                        <option value="acme-corp" selected>Acme Corp (Tenant A)</option>
+                        <option value="globex">Globex Inc (Tenant B)</option>
+                        <option value="hooli">Hooli Ltd (Tenant C)</option>
+                        <option value="test-tenant">Test Tenant</option>
                     </select>
                 </div>
                 <div class="control-item">
-                    <label>Operator Role</label>
+                    <label>Role</label>
                     <select id="widget-role" onchange="generateToken()">
                         <option value="support_agent">Support Agent</option>
-                        <option value="manager" selected>Manager (HITL access)</option>
+                        <option value="manager" selected>Manager (HITL Access)</option>
                         <option value="admin">Administrator</option>
                     </select>
                 </div>
-                <div class="token-status-badge status-green" id="token-status">
-                    <span style="width: 8px; height: 8px; border-radius: 50%; background-color: currentColor; display: inline-block;"></span>
-                    <span id="token-status-text">Active (Generated)</span>
-                </div>
-                <button class="btn-copy-token" id="btn-copy-jwt" onclick="copyJWTToClipboard()" title="Copy JWT Token" style="display: none;">
-                    📋 Copy Token
-                </button>
-                <button class="btn btn-success" style="padding: 8px 14px; font-size: 12px; border-radius: 8px;" onclick="generateToken()">
-                    🔄 Refresh Token
-                </button>
+                <span class="auth-status auth-ok" id="auth-status">
+                    <span style="width: 7px; height: 7px; border-radius: 50%; background-color: currentColor; display: inline-block; animation: pulse-dot 1.5s infinite;"></span>
+                    <span id="auth-status-text">Authenticated</span>
+                </span>
             </div>
         </div>
 
@@ -1091,23 +1088,13 @@ HTML_CONTENT = """<!DOCTYPE html>
             }, 3000);
         }
 
-        function copyJWTToClipboard() {
-            if (!currentToken) return;
-            navigator.clipboard.writeText(currentToken).then(() => {
-                showToast("JWT Token copied to clipboard!");
-            }).catch(err => {
-                console.error('Failed to copy token: ', err);
-                showToast("Copy failed", true);
-            });
-        }
-
         async function generateToken() {
             const tenant = document.getElementById('widget-tenant').value;
             const role = document.getElementById('widget-role').value;
             
-            const statusBadge = document.getElementById('token-status');
-            const statusText = document.getElementById('token-status-text');
-            const copyBtn = document.getElementById('btn-copy-jwt');
+            const authBadge = document.getElementById('auth-status');
+            const authText = document.getElementById('auth-status-text');
+            const sessionDot = document.getElementById('session-dot');
             
             try {
                 const response = await fetch(`/api/v1/test-token?tenant_id=${tenant}&role=${role}`);
@@ -1117,9 +1104,10 @@ HTML_CONTENT = """<!DOCTYPE html>
                 const data = await response.json();
                 if(data.token) {
                     currentToken = data.token;
-                    statusBadge.className = "token-status-badge status-green";
-                    statusText.innerText = "Active (Generated)";
-                    copyBtn.style.display = "inline-flex";
+                    authBadge.className = "auth-status auth-ok";
+                    authText.innerText = "Authenticated";
+                    sessionDot.style.backgroundColor = "var(--success)";
+                    sessionDot.style.boxShadow = "0 0 10px var(--success-glow)";
                     
                     // Reload histories
                     if(document.getElementById('dashboard-view').classList.contains('active')) {
@@ -1132,10 +1120,13 @@ HTML_CONTENT = """<!DOCTYPE html>
                 }
             } catch(e) {
                 console.error("Token generation failed", e);
-                statusBadge.className = "token-status-badge status-red";
-                statusText.innerText = "Inactive (Error)";
-                copyBtn.style.display = "none";
-                showToast("Failed to fetch test token", true);
+                authBadge.className = "auth-status auth-fail";
+                authText.innerText = "Auth Failed";
+                sessionDot.style.backgroundColor = "var(--danger)";
+                sessionDot.style.boxShadow = "0 0 10px var(--danger-glow)";
+                showToast("Session authentication failed — retrying...", true);
+                // Auto-retry after 3 seconds
+                setTimeout(() => generateToken(), 3000);
             }
         }
 
