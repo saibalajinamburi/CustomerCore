@@ -12,6 +12,9 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
+    env:
+      REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
@@ -106,5 +109,5 @@ jobs:
         cat report.md >> $GITHUB_STEP_SUMMARY
         
         # Create comment on Commit/PR
-        cml comment create report.md
+        cml comment create report.md || echo "⚠️ Warning: CML comment creation failed."
 

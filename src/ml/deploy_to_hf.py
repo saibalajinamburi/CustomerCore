@@ -87,8 +87,7 @@ def deploy():
             repo_id=hf_space,
             repo_type="space",
             token=hf_token,
-            ignore_patterns=ignore_patterns,
-            delete_ok=True
+            ignore_patterns=ignore_patterns
         )
         print("Successfully deployed to Hugging Face Spaces!")
     except Exception as e:
