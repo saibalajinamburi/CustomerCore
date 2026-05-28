@@ -8,187 +8,189 @@ app_port: 7860
 pinned: false
 ---
 
+![CustomerCore AI Platform Header Banner](docs/images/customercore_banner.png)
+
 # CustomerCore Intelligence Platform
 
-Real-time multi-tenant customer intelligence powered by streaming (Redpanda), lakehouse storage (Iceberg/R2), multi-agent AI (LangGraph), and full MLOps (MLflow/DagsHub).
+> **Real-time, multi-tenant B2B customer support intelligence engine.** Decoupled event streaming pipelines, secure cryptographic privacy vaults, stateful multi-agent supervisor networks, and comprehensive MLOps validation.
 
-[![Python](https://img.shields.io/badge/Python-3.12-blue)](https://www.python.org/)
-[![Tests](https://img.shields.io/badge/tests-passing-brightgreen)](https://github.com/saibalajinamburi/CustomerCore/actions)
-[![License](https://img.shields.io/badge/license-MIT-green)](https://opensource.org/licenses/MIT)
-[![EU AI Act](https://img.shields.io/badge/EU%20AI%20Act-Compliant-blue)](#responsible-ai)
-[![HF Spaces](https://img.shields.io/badge/HF%20Spaces-Live-orange)](https://huggingface.co/spaces/saibalajiomg/customercore)
-
-CustomerCore is an enterprise-grade customer intelligence system designed to automate ticket classification, prioritize issues, calculate churn and SLA breach risks, recall agent memories, retrieve grounded facts, and run automated human-in-the-loop triage flows.
-
----
-
-## Live System Links
-
-| Asset | Link | Status |
-|---|---|---|
-| **Live Operations Console (HF Spaces)** | [huggingface.co/spaces/saibalajiomg/customercore](https://huggingface.co/spaces/saibalajiomg/customercore) | ![uptime](https://img.shields.io/badge/Uptime-100%25-brightgreen) |
-| **GitHub Repository** | [github.com/saibalajinamburi/CustomerCore](https://github.com/saibalajinamburi/CustomerCore) | Active |
-| **DagsHub Repository & DVC** | [dagshub.com/saibalajinamburi/CustomerCore](https://dagshub.com/saibalajinamburi/CustomerCore) | Connected |
-| **MLflow Experiment Server** | [dagshub.com/saibalajinamburi/CustomerCore.mlflow](https://dagshub.com/saibalajinamburi/CustomerCore.mlflow) | Runs Tracked |
-| **MLflow Model Registry** | [dagshub.com/saibalajinamburi/CustomerCore/models](https://dagshub.com/saibalajinamburi/CustomerCore/models) | Versioned Models |
-| **CI/CD Pipeline** | [github.com/saibalajinamburi/CustomerCore/actions](https://github.com/saibalajinamburi/CustomerCore/actions) | Passing ✅ |
+<p align="left">
+  <img src="https://img.shields.io/badge/Python-3.12-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python 3.12" />
+  <img src="https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white" alt="FastAPI" />
+  <img src="https://img.shields.io/badge/Redpanda-FF0000?style=for-the-badge&logo=redpanda&logoColor=white" alt="Redpanda" />
+  <img src="https://img.shields.io/badge/Supabase-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white" alt="Supabase" />
+  <img src="https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white" alt="Docker" />
+  <img src="https://img.shields.io/badge/Hugging_Face-FFD21E?style=for-the-badge&logo=huggingface&logoColor=black" alt="Hugging Face" />
+</p>
 
 ---
 
-## Architecture Overview
+## 🔗 Live Operations & MLOps Infrastructure
 
-See [ARCHITECTURE.md](ARCHITECTURE.md) for the full system diagram and description of the data flow pipeline.
-
-### Core Pipelines
-1. **Streaming Data Flow:** Kafka-compatible Redpanda topics (`tickets`, `product`, `billing`, `incidents`) ingest event micro-batches.
-2. **Spark Lakehouse:** PySpark Structured Streaming processes raw data from Bronze to Silver layers with real-time PII masking and schema validation, writing to Apache Iceberg format.
-3. **dbt Gold Layer:** Transforms silver tables into 7 curated business marts for analytics, features, and model training.
-4. **LangGraph Triage:** A stateful multi-agent supervisor orchestrates six specialized sub-agents (Classify, Memory, RAG, Churn, Incident, and HITL) to yield a Pydantic-validated 14-field triage output in `<2s`.
-
----
-
-## What It Does
-
-When a support ticket is received at `/api/v1/triage`, the LangGraph supervisor executes the following sequence:
-
-1. **Classify Agent:** Determines ticket category and initial priority.
-2. **Memory Agent:** Recalls customer profile and past session memories from Mem0 (Supabase pgvector).
-3. **RAG Agent:** Injects context using hybrid retrieval (Dense + BM25 sparse) from the Knowledge Base and product documentation, reranked by a cross-encoder model.
-4. **Churn Agent:** Evaluates churn risk using a local **Random Forest Classifier** trained on client metrics.
-5. **Incident Agent:** Inspects incident patterns and flags SLA-breach risks.
-6. **HITL Agent:** Interrupts the graph and pauses execution if safety flags are violated or if classifier confidence falls below `0.65`, routing the ticket to the Supabase-backed human-in-the-loop review queue.
-7. **Finalize & Log:** Consolidates state, applies PII scrubbing, logs the audit trail, and pushes a structured trace to Langfuse.
+| Platform Service | Endpoint / Link | Status |
+| :--- | :--- | :--- |
+| 🖥️ **Operations Console UI** | [huggingface.co/spaces/saibalajiomg/customercore](https://huggingface.co/spaces/saibalajiomg/customercore) | ![Live Status](https://img.shields.io/badge/Live-Uptime_100%25-brightgreen?style=flat-square) |
+| 📊 **MLflow Experiment Workspace** | [dagshub.com/saibalajinamburi/CustomerCore.mlflow](https://dagshub.com/saibalajinamburi/CustomerCore.mlflow) | ![MLflow runs](https://img.shields.io/badge/MLflow-Active_Runs-blue?style=flat-square) |
+| 📦 **DagsHub Model Registry** | [dagshub.com/saibalajinamburi/CustomerCore/models](https://dagshub.com/saibalajinamburi/CustomerCore/models) | ![Registry Version](https://img.shields.io/badge/Registry-Production_Active-orange?style=flat-square) |
+| 📂 **DagsHub DVC Storage** | [dagshub.com/saibalajinamburi/CustomerCore](https://dagshub.com/saibalajinamburi/CustomerCore) | ![DVC tracking](https://img.shields.io/badge/DVC-Data_Versioned-brightgreen?style=flat-square) |
+| ⚙️ **GitHub CI/CD Actions** | [github.com/saibalajinamburi/CustomerCore/actions](https://github.com/saibalajinamburi/CustomerCore/actions) | ![Tests Status](https://img.shields.io/badge/Build-Passing-brightgreen?style=flat-square) |
 
 ---
 
-## Technology Stack
+## 🗺️ Architectural Topology
 
-| Layer | Technology |
-|---|---|
-| **Streaming Backbone** | Redpanda (Kafka-compatible event broker) |
-| **Lakehouse Storage** | Apache Iceberg on Cloudflare R2 / MinIO |
-| **Stream Processing** | PySpark Structured Streaming / PyArrow |
-| **Transformation** | dbt-core with DuckDB adapter (7 Gold marts) |
-| **Vector Database** | ChromaDB (BM25 sparse + BGE-M3 dense hybrid retrieval) |
-| **LLM Gateway** | LiteLLM routing proxy & Semantic Cache (L1/L2/L3) |
-| **Agent Framework** | LangGraph multi-agent supervisor |
-| **Long-Term Memory** | Mem0 backed by Supabase pgvector |
-| **ML Models & Registry** | Random Forest Classifier, MLflow, DagsHub, DVC |
-| **LLM Observability** | Langfuse (prompt management and tracing) & LangSmith |
-| **Infrastructure Observability**| OpenTelemetry, Prometheus metrics, Grafana Cloud |
-| **CI/CD & CML** | GitHub Actions with Continuous Machine Learning metrics reporting |
-| **Hosting** | Hugging Face Spaces Docker (Inference) & Supabase PostgreSQL |
+CustomerCore coordinates raw streaming data, distributed file systems, stateful AI graph execution, and infrastructure observability.
 
----
+```mermaid
+flowchart TD
+    subgraph Ingestion ["1. Event Streaming Backplane"]
+        API[FastAPI Gateway]
+        GH[GitHub Webhooks]
+        SE[Synthetic Event Generators]
+        RP[Redpanda Stream Broker]
+        
+        API -->|Publish| RP
+        GH -->|Webhooks| RP
+        SE -->|Simulate Events| RP
+    end
 
-## Quick Start (Local)
+    subgraph Lakehouse ["2. Data Lakehouse & Transformations"]
+        SP[PySpark Structured Streaming]
+        R2[(Cloudflare R2 Object Storage)]
+        Duck[DuckDB / local dbt]
+        
+        RP -->|Bronze Stream| SP
+        SP -->|PII Masking & Silver| R2
+        R2 -->|dbt transformation| Duck
+    end
 
-### 1. Prerequisites
-- Docker & Docker Compose
-- Python 3.12
-- Doppler CLI (optional, for secret injection)
+    subgraph Modeling ["3. Model Registry & Feature Engine"]
+        FS[Feast Feature Store]
+        ML[MLflow Tracking Server]
+        Models[DagsHub Model Registry]
+        
+        Duck -->|Gold Marts| FS
+        Duck -->|Train Set| ML
+        ML -->|Register Churn Model| Models
+    end
 
-### 2. Installation
-```bash
-git clone https://github.com/saibalajinamburi/CustomerCore.git
-cd CustomerCore
-python -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-pip install -r requirements.txt
+    subgraph Observability ["4. Observability & Tracing"]
+        PROM[Prometheus Scraper]
+        OTEL[OTel Collector]
+        GRAF[Grafana Dashboards]
+        LF[Langfuse Cloud Traces]
+        
+        API -->|Scrape Metrics| PROM
+        PROM --> OTEL --> GRAF
+        API -->|Audit Logs| LF
+    end
+
+    style RP fill:#FFEEEE,stroke:#CC0000,stroke-width:2px
+    style R2 fill:#FFF6EE,stroke:#D4A373,stroke-width:2px
+    style Models fill:#E8F0FE,stroke:#1A73E8,stroke-width:2px
+    style GRAF fill:#F3E8FF,stroke:#7C3AED,stroke-width:2px
 ```
 
-### 3. Running Locally
+---
 
-#### Run base services (Redpanda, MinIO, Redis, ChromaDB, OTel):
-```bash
-docker compose up -d
+## 🛠️ Unified Execution: Local vs. Cloud Mode
+
+The platform runs in two topologies without modifying a single line of business logic:
+
+| Operational Dimension | 💻 Local Development Mode (Full Local) | ☁️ Cloud / Production Mode (HF + Supabase) |
+| :--- | :--- | :--- |
+| **Ingestion Engine** | Local Redpanda Broker (`localhost:9092`) | Asynchronous Event Streaming queues |
+| **Relational Database** | Local SQLite (`customercore.db`) | **Supabase PostgreSQL** (cloud-managed) |
+| **Vector Store** | In-Process ChromaDB | **Supabase pgvector** (cryptographically isolated) |
+| **PII Protection** | Local Presidio + spaCy sm | Local Privacy Vault (in-process microservice) |
+| **Reasoning Model** | Local **Ollama** (`gemma3:4b` / `gemma2:2b`) | Cloud Frontier LLMs via **OpenRouter** gateway |
+| **Metrics Collector** | Local Prometheus + local Grafana | Prometheus + OpenTelemetry to **Grafana Cloud** |
+| **Telemetry Tracing** | Console Debug Exporter | **Langfuse Cloud** (LLM cost and prompt versioning) |
+
+---
+
+## 🧠 LangGraph Multi-Agent Triage Network
+
+Processing customer support requests relies on a stateful supervisor graph that coordinates six distinct agent nodes:
+
+![LangGraph Agent Network Architecture](docs/images/customercore_agents.png)
+
+1.  **Classify Agent**: Evaluates the incoming ticket to categorize it (Billing, Technical, Security) and assign priority (Low, Medium, High, Critical).
+2.  **Memory Agent**: Queries **Mem0** using tenant-scoped identifiers to fetch past session memory and customer profile contexts.
+3.  **RAG Agent**: Executes hybrid vector (ChromaDB) and keyword (BM25) search on knowledge bases, retrieving past resolutions.
+4.  **Churn Agent**: Computes customer churn risk by passing metrics through our custom **Random Forest Classifier**.
+5.  **Incident Agent**: Scans incoming ticket frequency to detect systemic infrastructure outages.
+6.  **HITL (Human-in-the-Loop) Agent**: Triggers an `interrupt()` block if priority is critical, safety boundaries are crossed, or classifier confidence falls below `0.65`, routing the request to the Supabase operator review queue.
+
+---
+
+## 📊 MLOps: Multi-Model Training & DagsHub Integration
+
+We train and evaluate multiple baseline classifiers, log parameters and datasets, and automatically promote the best model to `"Production"` on DagsHub.
+
+```
+DagsHub Repository Page
+  ├── Files Tab        <-- Shows dataset and binary weights files versioned by DVC
+  ├── Experiments Tab  <-- Compares parameters, F1 metrics, and charts for all runs
+  └── Models Tab       <-- Displays the active Production version in the registry
 ```
 
-#### Run observability console (Prometheus + Grafana):
+### Steps to Train and Register:
+1.  **Initialize local virtual environment**:
+    ```bash
+    source .venv/bin/activate  # Windows: .venv\Scripts\activate
+    ```
+2.  **Set environment variables**:
+    ```powershell
+    $env:MLFLOW_TRACKING_USERNAME="YOUR_DAGSHUB_USERNAME"
+    $env:MLFLOW_TRACKING_PASSWORD="YOUR_DAGSHUB_TOKEN"
+    $env:PYTHONIOENCODING="utf-8"
+    ```
+3.  **Execute the training pipeline**:
+    ```bash
+    doppler run -- python -X utf8 src/ml/train_churn.py
+    ```
+    This script automatically:
+    - Trains **Logistic Regression**, **Random Forest**, and **Gradient Boosting** models.
+    - Logs parameters, metrics, and artifact plots (ROC Curve, Confusion Matrix) to DagsHub.
+    - Registers the Pandas dataset details in the MLflow run.
+    - Compares F1-Scores, registers the best model version, and promotes it to the **`Production`** stage in the registry.
+
+4.  **Push dataset files to DVC remote**:
+    ```bash
+    doppler run -- dvc push
+    ```
+
+---
+
+## 🖥️ Local Observability Stack (Grafana & Prometheus)
+
+CustomerCore is pre-provisioned with a local monitoring console to inspect real-time platform diagnostics.
+
+### 1. Spin up base stack + monitoring containers:
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.monitoring.yml up -d
 ```
-*   **Grafana Dashboard**: Open `http://localhost:3000` (pre-provisioned with metrics visualizations, no login required).
-*   **Prometheus Console**: Open `http://localhost:9090`.
 
-#### Start the FastAPI gateway:
-Using Doppler:
-```bash
-doppler run -- uvicorn src.api.main:app --reload --port 8080
-```
-Without Doppler:
-```bash
-uvicorn src.api.main:app --reload --port 8080
-```
+### 2. Open dashboards:
+*   **Grafana Dashboard**: Open `http://localhost:3000` (pre-loaded with metrics plots, anonymous Admin access).
+*   **Prometheus UI**: Open `http://localhost:9090`.
 
-#### Check Health:
-```bash
-curl http://localhost:8080/api/v1/health
-```
+### 3. Visualized metrics panels:
+- **Triage Ingestion Rate**: Incoming tickets per second (success vs. pending vs. error).
+- **p95 Latency Profiles**: Millisecond duration distribution across ticket priorities.
+- **LLM Call Reliability**: API calls volume categorized by model type and status.
+- **LLM Cost Tracker**: Cumulative API spend in USD.
+- **Semantic Cache Hit Ratio**: Hit vs. miss rates of L1/L2 caches.
+- **HITL Reason Distribution**: Breakdown of safety or confidence-based reviews.
 
 ---
 
-## ML Model Training & DagsHub Integration
+## 🔒 EU AI Act Compliance Mapping
 
-We train a **Random Forest Churn Predictor** locally or in CI, logging parameters, metrics, performance plots (ROC, Confusion Matrix, Feature Importance), and the model binaries directly to DagsHub's MLflow Experiments Server and Model Registry.
+CustomerCore is built from the ground up to comply with **EU AI Act standards (Article 10-15)**:
 
-To train the model and push to DagsHub manually:
-```bash
-# Set DagsHub credentials in your shell environment
-$env:MLFLOW_TRACKING_USERNAME="saibalajinamburi"
-$env:MLFLOW_TRACKING_PASSWORD="YOUR_DAGSHUB_TOKEN"
-$env:PYTHONIOENCODING="utf-8"
-
-# Train model and track in MLflow Model Registry
-doppler run -- python -X utf8 src/ml/train_churn.py
-
-# Push raw dataset file versioning via DVC
-doppler run -- dvc push
-```
-
----
-
-## Project Structure
-
-```text
-customercore/
-├── .github/workflows/    # CI/CD Workflows (Lint, Pytest, HF Deploy, CML Train)
-├── infra/
-│   ├── monitoring/       # Prometheus and Grafana local config & dashboards
-│   ├── k8s/              # Kubernetes YAML manifests (Deployment, Ingress, Secrets)
-│   ├── kind-config.yaml  # Kind local multi-node cluster configuration
-│   └── otel-collector.yaml
-├── src/
-│   ├── api/              # FastAPI Application endpoints and middleware
-│   ├── agent/            # LangGraph supervisor and agent nodes
-│   ├── rag/              # ChromaDB, Hybrid Retriever, Semantic Cache
-│   ├── ml/               # Model training scripts (Random Forest)
-│   ├── streaming/        # Redpanda Producers and PySpark pipeline
-│   ├── dbt/              # dbt transform pipeline (Gold marts)
-│   ├── db/               # Supabase database repositories and clients
-│   └── responsible_ai/   # Model cards, fairness evaluation, audit logger
-├── tests/                # Unit and integration test suites
-├── Dockerfile            # Default Production Dockerfile
-├── Dockerfile.hf         # Hugging Face optimized Dockerfile
-├── docker-compose.yml    # Standard services configuration
-└── docker-compose.monitoring.yml # Local Grafana / Prometheus observability stack
-```
-
----
-
-## Responsible AI & EU AI Act Compliance
-
-CustomerCore is designed with compliance in mind for the **EU AI Act (effective August 2026)**:
-- **Article 10 (Data Governance):** Schema enforcement and automated PII masking via Presidio.
-- **Article 12 (Traceability):** Structured audit logging of all constitutional violations and inputs/outputs to Supabase PostgreSQL.
-- **Article 14 (Human Oversight):** LangGraph-native `interrupt()` gates that pause low-confidence decisions for manual human sign-off.
-- **Article 15 (Accuracy & Security):** Model card documentation for all ML models (`src/responsible_ai/model_cards/`) and demographic fairness accuracy gaps.
-
----
-
-## Author
-
-**Saibalaji Namburi**  
-MSc Data Analytics, University of Hildesheim  
-- GitHub: [@saibalajinamburi](https://github.com/saibalajinamburi)
-- DagsHub: [saibalajinamburi](https://dagshub.com/saibalajinamburi)
+*   **Article 10 (Data Governance & Masking)**: Dynamic **Cryptographic Privacy Vault** runs spaCy and Presidio locally in-process to redact names, credit cards, emails, and phone numbers before any database insert or API call.
+*   **Article 12 (Audit Traceability)**: Every model decision, input prompt, output resolution, and safety violation is logged into a durable PostgreSQL audit table.
+*   **Article 14 (Human-in-the-Loop Oversight)**: High-risk decisions or low-confidence predictions are intercepted and paused using LangGraph checkpointers, waiting for human operator approval before execution.
+*   **Article 15 (Fairness & Security)**: Features fairness audits, model cards tracking, and adversarial input-output safety policy checks to prevent jailbreaks.
