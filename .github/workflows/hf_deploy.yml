@@ -13,14 +13,18 @@ jobs:
       with:
         fetch-depth: 0
 
-    - name: Prepare Hugging Face Dockerfile
+    - name: Prepare Hugging Face README and Dockerfile
       run: |
         cp Dockerfile.hf Dockerfile
+        # Prepend Hugging Face metadata header to README.md
+        printf -- "---\ntitle: CustomerCore API\nemoji: 🚀\ncolorFrom: blue\ncolorTo: indigo\nsdk: docker\napp_port: 7860\npinned: false\n---\n" > temp_readme
+        cat README.md >> temp_readme
+        mv temp_readme README.md
         # Configure git metadata
         git config --global user.email "github-actions@github.com"
         git config --global user.name "GitHub Actions"
-        git add Dockerfile
-        git commit -m "deploy: sync Dockerfile.hf to Dockerfile for Hugging Face" || echo "No changes to commit"
+        git add Dockerfile README.md
+        git commit -m "deploy: sync Dockerfile and README for Hugging Face" || echo "No changes to commit"
 
     - name: Push to Hugging Face Spaces
       env:

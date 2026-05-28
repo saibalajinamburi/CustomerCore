@@ -1,20 +1,7 @@
----
-title: CustomerCore API
-emoji: 🚀
-colorFrom: blue
-colorTo: indigo
-sdk: docker
-app_port: 7860
-pinned: false
----
+<h1 align="center">CustomerCore AI Platform</h1>
+<p align="center"><strong>Real-Time Multi-Tenant Support Intelligence & Stateful Agent Supervisor</strong></p>
 
-![CustomerCore AI Platform Header Banner](docs/images/customercore_banner.png)
-
-# CustomerCore Intelligence Platform
-
-> **Real-time, multi-tenant B2B customer support intelligence engine.** Decoupled event streaming pipelines, secure cryptographic privacy vaults, stateful multi-agent supervisor networks, and comprehensive MLOps validation.
-
-<p align="left">
+<p align="center">
   <img src="https://img.shields.io/badge/Python-3.12-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python 3.12" />
   <img src="https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white" alt="FastAPI" />
   <img src="https://img.shields.io/badge/Redpanda-FF0000?style=for-the-badge&logo=redpanda&logoColor=white" alt="Redpanda" />
@@ -93,7 +80,7 @@ flowchart TD
 
 ---
 
-## 🛠️ Unified Execution: Local vs. Cloud Mode
+## 🛠_ Unified Execution: Local vs. Cloud Mode
 
 The platform runs in two topologies without modifying a single line of business logic:
 
@@ -102,7 +89,7 @@ The platform runs in two topologies without modifying a single line of business 
 | **Ingestion Engine** | Local Redpanda Broker (`localhost:9092`) | Asynchronous Event Streaming queues |
 | **Relational Database** | Local SQLite (`customercore.db`) | **Supabase PostgreSQL** (cloud-managed) |
 | **Vector Store** | In-Process ChromaDB | **Supabase pgvector** (cryptographically isolated) |
-| **PII Protection** | Local Presidio + spaCy sm | Local Privacy Vault (in-process microservice) |
+| **PII Protection** | Local Privacy Vault (Microsoft Presidio) | Local Privacy Vault (in-process microservice) |
 | **Reasoning Model** | Local **Ollama** (`gemma3:4b` / `gemma2:2b`) | Cloud Frontier LLMs via **OpenRouter** gateway |
 | **Metrics Collector** | Local Prometheus + local Grafana | Prometheus + OpenTelemetry to **Grafana Cloud** |
 | **Telemetry Tracing** | Console Debug Exporter | **Langfuse Cloud** (LLM cost and prompt versioning) |
@@ -113,7 +100,23 @@ The platform runs in two topologies without modifying a single line of business 
 
 Processing customer support requests relies on a stateful supervisor graph that coordinates six distinct agent nodes:
 
-![LangGraph Agent Network Architecture](docs/images/customercore_agents.png)
+```mermaid
+graph TD
+    A[Input Ticket] --> B[Supervisor Router]
+    B -->|classify| C[Classify Agent]
+    B -->|recall| D[Memory Agent]
+    B -->|retrieve| E[RAG Agent]
+    B -->|evaluate| F[Churn Agent]
+    B -->|pattern| G[Incident Agent]
+    B -->|interrupt| H[HITL Agent]
+    
+    C & D & E & F & G & H -->|update state| B
+    B -->|finalize| I[PII Scrub & Response Generation]
+    
+    style B fill:#E8F0FE,stroke:#1A73E8,stroke-width:2px
+    style H fill:#FFEEEE,stroke:#CC0000,stroke-width:2px
+    style I fill:#D1FAE5,stroke:#059669,stroke-width:2px
+```
 
 1.  **Classify Agent**: Evaluates the incoming ticket to categorize it (Billing, Technical, Security) and assign priority (Low, Medium, High, Critical).
 2.  **Memory Agent**: Queries **Mem0** using tenant-scoped identifiers to fetch past session memory and customer profile contexts.
@@ -190,7 +193,7 @@ docker compose -f docker-compose.yml -f docker-compose.monitoring.yml up -d
 
 CustomerCore is built from the ground up to comply with **EU AI Act standards (Article 10-15)**:
 
-*   **Article 10 (Data Governance & Masking)**: Dynamic **Cryptographic Privacy Vault** runs spaCy and Presidio locally in-process to redact names, credit cards, emails, and phone numbers before any database insert or API call.
+*   **Article 10 (Data Governance & Masking)**: Dynamic **Privacy Vault** runs spaCy and Presidio locally in-process to redact names, credit cards, emails, and phone numbers before any database insert or API call.
 *   **Article 12 (Audit Traceability)**: Every model decision, input prompt, output resolution, and safety violation is logged into a durable PostgreSQL audit table.
 *   **Article 14 (Human-in-the-Loop Oversight)**: High-risk decisions or low-confidence predictions are intercepted and paused using LangGraph checkpointers, waiting for human operator approval before execution.
 *   **Article 15 (Fairness & Security)**: Features fairness audits, model cards tracking, and adversarial input-output safety policy checks to prevent jailbreaks.
