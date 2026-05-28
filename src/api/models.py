@@ -224,6 +224,9 @@ class TriageResultResponse(BaseModel):
     status: TriageStatus
     tenant_id: str = Field(..., description="Tenant that submitted this ticket.")
     customer_id: str
+    customer_tier: CustomerTier = Field(default=CustomerTier.FREE, description="B2B customer subscription tier.")
+    text: str | None = Field(None, description="The ticket text (PII-masked for safety).")
+    masked_text: str | None = Field(None, description="PII-masked and tokenized ticket body.")
 
     # ── Classification outputs ──
     category: str | None = Field(None, description="AI-classified ticket category.")

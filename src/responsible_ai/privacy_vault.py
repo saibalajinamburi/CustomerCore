@@ -143,6 +143,8 @@ class CryptographicPrivacyVault:
     decrypt_token()  — decrypt a token back to plaintext (RBAC-enforced)
     forget_tenant()  — GDPR deletion cascade for all tokens of a tenant
     """
+    _analyzer_cached = None
+    _anonymizer_cached = None
 
     def __init__(
         self,
@@ -217,8 +219,8 @@ class CryptographicPrivacyVault:
         *,
         tenant_id: str,
         text: str,
-        analyzer,
-        anonymizer,
+        analyzer=None,
+        anonymizer=None,
         ticket_id: str = "",
         pii_entities: list[str] | None = None,
     ) -> tuple[str, int]:
@@ -229,6 +231,18 @@ class CryptographicPrivacyVault:
         Returns (tokenized_text, count_of_pii_detected).
         Falls back to standard Presidio anonymization if vault is disabled.
         """
+        if analyzer is None or anonymizer is None:
+            if CryptographicPrivacyVault._analyzer_cached is None or CryptographicPrivacyVault._anonymizer_cached is None:
+                from presidio_analyzer import AnalyzerEngine
+                from presidio_anonymizer import AnonymizerEngine
+                from presidio_analyzer.nlp_engine import NlpEngineProvider
+                nlp_config = {"nlp_engine_name": "spacy", "models": [{"lang_code": "en", "model_name": "en_core_web_sm"}]}
+                nlp_engine = NlpEngineProvider(nlp_configuration=nlp_config).create_engine()
+                CryptographicPrivacyVault._analyzer_cached = AnalyzerEngine(nlp_engine=nlp_engine)
+                CryptographicPrivacyVault._anonymizer_cached = AnonymizerEngine()
+            analyzer = analyzer or CryptographicPrivacyVault._analyzer_cached
+            anonymizer = anonymizer or CryptographicPrivacyVault._anonymizer_cached
+
         if not text or not isinstance(text, str):
             return text, 0
 

@@ -1089,8 +1089,14 @@ HTML_CONTENT = """<!DOCTYPE html>
         }
 
         async function generateToken() {
-            const tenant = document.getElementById('widget-tenant').value;
-            const role = document.getElementById('widget-role').value;
+            const tenantEl = document.getElementById('widget-tenant');
+            const roleEl = document.getElementById('widget-role');
+            const tenant = tenantEl.value;
+            const role = roleEl.value;
+            
+            // Adjust dropdown widths automatically
+            adjustSelectWidth(tenantEl);
+            adjustSelectWidth(roleEl);
             
             const authBadge = document.getElementById('auth-status');
             const authText = document.getElementById('auth-status-text');
@@ -1221,6 +1227,7 @@ HTML_CONTENT = """<!DOCTYPE html>
                     clearInterval(pollInterval);
                     btn.disabled = false;
                     btn.innerText = "Dispatch to Triage Pipeline";
+                    showToast("Triage pipeline tracking error — please check connectivity", true);
                 }
             }, 1000);
         }
@@ -1234,14 +1241,20 @@ HTML_CONTENT = """<!DOCTYPE html>
             priorityEl.className = `metric-value priority-badge priority-${priorityVal.toLowerCase()}`;
 
             // Routing
-            document.getElementById('metric-routing').innerText = data.routing_department || "General Support";
+            const routingTeam = (data.escalation_team || data.category || "General Support").replace(/_/g, ' ');
+            document.getElementById('metric-routing').innerText = routingTeam;
 
             // Outage
-            document.getElementById('metric-outage').innerText = data.potential_outage ? "⚠️ Outage Alert!" : "✅ Normal";
+            document.getElementById('metric-outage').innerText = data.incident_active ? "⚠️ Outage Alert!" : "✅ Normal";
 
             // Churn Risk
-            const churnScore = data.churn_risk_score !== undefined ? data.churn_risk_score : 0.15;
-            const churnPercent = Math.round(churnScore * 100);
+            let churnPercent = 15;
+            if (data.churn_risk === "low") churnPercent = 15;
+            else if (data.churn_risk === "medium") churnPercent = 45;
+            else if (data.churn_risk === "high") churnPercent = 75;
+            else if (data.churn_risk === "critical") churnPercent = 95;
+            else if (data.churn_risk_score !== undefined) churnPercent = Math.round(data.churn_risk_score * 100);
+            
             document.getElementById('metric-churn').innerText = `${churnPercent}%`;
             document.getElementById('churn-progress').style.width = `${churnPercent}%`;
 
@@ -1250,11 +1263,11 @@ HTML_CONTENT = """<!DOCTYPE html>
 
             // PII masking logs
             let piiText = `[Vault Ingestion]\n`;
-            piiText += `- Ticket ID: ${data.ticket_id}\n`;
-            piiText += `- Customer ID: ${data.customer_id}\n`;
+            piiText += `- Ticket ID: ${data.ticket_id || '--'}\n`;
+            piiText += `- Customer ID: ${data.customer_id || '--'}\n`;
             piiText += `- Raw Text masked? Yes\n`;
-            if (data.masked_text) {
-                piiText += `- Redacted Body: "${data.masked_text}"\n`;
+            if (data.masked_text || data.text) {
+                piiText += `- Redacted Body: "${data.masked_text || data.text}"\n`;
             }
             document.getElementById('metric-pii-log').innerText = piiText;
 
@@ -1269,7 +1282,9 @@ HTML_CONTENT = """<!DOCTYPE html>
                 if (data.constitutional_violations && data.constitutional_violations.length > 0) {
                     piiText += `\n[Safety Violations Detected]\n`;
                     data.constitutional_violations.forEach(v => {
-                        piiText += `- Rule: ${v.rule_id} | Reason: ${v.reason}\n`;
+                        const ruleId = v.rule || v.rule_id || "UNKNOWN_RULE";
+                        const reason = v.explanation || v.reason || "Safety policy trigger";
+                        piiText += `- Rule: ${ruleId} | Reason: ${reason}\n`;
                     });
                     document.getElementById('metric-pii-log').innerText = piiText;
                 }
@@ -1466,9 +1481,37 @@ HTML_CONTENT = """<!DOCTYPE html>
             }
         }
 
+        // Automatically adjust select box width based on text length
+        function adjustSelectWidth(selectEl) {
+            if (!selectEl) return;
+            const tempSpan = document.createElement("span");
+            tempSpan.style.visibility = "hidden";
+            tempSpan.style.position = "absolute";
+            tempSpan.style.whiteSpace = "pre";
+            
+            const style = window.getComputedStyle(selectEl);
+            tempSpan.style.fontFamily = style.fontFamily;
+            tempSpan.style.fontSize = style.fontSize;
+            tempSpan.style.fontWeight = style.fontWeight;
+            tempSpan.style.letterSpacing = style.letterSpacing;
+            
+            const selectedText = selectEl.options[selectEl.selectedIndex].text;
+            tempSpan.innerText = selectedText;
+            document.body.appendChild(tempSpan);
+            
+            const textWidth = tempSpan.getBoundingClientRect().width;
+            selectEl.style.width = (textWidth + 36) + "px"; // 36px accounts for arrow padding
+            
+            document.body.removeChild(tempSpan);
+        }
+
         // Initialize Page
         window.addEventListener('DOMContentLoaded', () => {
             loadPreset('billing');
+            setTimeout(() => {
+                adjustSelectWidth(document.getElementById('widget-tenant'));
+                adjustSelectWidth(document.getElementById('widget-role'));
+            }, 100);
         });
     </script>
 </body>

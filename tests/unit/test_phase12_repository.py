@@ -309,3 +309,49 @@ class TestTenantRepository:
         qb.upsert.assert_called_once()
         call_kwargs = qb.upsert.call_args[1]
         assert call_kwargs.get("on_conflict") == "slug"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Console Bug Fixes and UI integration tests
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestBugFixes:
+
+    def test_record_new_fields(self):
+        record = TicketRecord(
+            id="t1", tenant_id="t1", customer_id="c1", channel="api", raw_text="text",
+            customer_tier="enterprise", masked_text="masked text"
+        )
+        assert record.customer_tier == "enterprise"
+        assert record.masked_text == "masked text"
+        
+        d = record.to_db_dict()
+        assert d["customer_tier"] == "enterprise"
+        assert d["masked_text"] == "masked text"
+
+    @pytest.mark.asyncio
+    async def test_update_status_maps_new_fields(self):
+        client, qb, _ = _make_supabase_mock()
+        with patch("src.db.repository.get_supabase", new=AsyncMock(return_value=client)):
+            repo = TicketRepository(TENANT_ID)
+            await repo.update_status("ticket-001", "complete", result_data={
+                "customer_tier": "vip",
+                "masked_text": "redacted info"
+            })
+        update_data = qb.update.call_args[0][0]
+        assert update_data["customer_tier"] == "vip"
+        assert update_data["masked_text"] == "redacted info"
+
+    def test_lazy_vault_initialization(self):
+        from src.responsible_ai.privacy_vault import CryptographicPrivacyVault
+        vault = CryptographicPrivacyVault()
+        # Should not crash and should lazily initialize spacy/presidio
+        tokenized, count = vault.encrypt_text(
+            tenant_id="test-tenant",
+            text="Contact me at test@example.com or 555-0199",
+            analyzer=None,
+            anonymizer=None
+        )
+        assert count > 0
+        assert "TOK_EMAIL" in tokenized or "TOK_PHONE" in tokenized
+

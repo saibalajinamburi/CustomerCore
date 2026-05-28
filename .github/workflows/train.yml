@@ -39,6 +39,10 @@ jobs:
       uses: iterative/setup-cml@v2
 
     - name: Train model and write metrics
+      env:
+        MLFLOW_TRACKING_URI: https://dagshub.com/saibalajinamburi/CustomerCore.mlflow
+        MLFLOW_TRACKING_USERNAME: saibalajinamburi
+        MLFLOW_TRACKING_PASSWORD: ${{ secrets.DAGSHUB_TOKEN }}
       run: |
         python src/ml/train_churn.py
 

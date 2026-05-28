@@ -28,9 +28,12 @@ CREATE TABLE IF NOT EXISTS tickets (
     tenant_id               UUID        NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
     external_ticket_id      TEXT,                         -- caller-supplied ID (idempotency)
     customer_id             TEXT        NOT NULL,
+    customer_tier           TEXT        NOT NULL DEFAULT 'free'
+                                        CHECK (customer_tier IN ('free','starter','growth','enterprise','vip')),
     channel                 TEXT        NOT NULL DEFAULT 'api'
                                         CHECK (channel IN ('email','chat','api','phone','portal')),
     raw_text                TEXT        NOT NULL,          -- original ticket body (stored encrypted)
+    masked_text             TEXT,
     detected_language       TEXT,
     status                  TEXT        NOT NULL DEFAULT 'pending'
                                         CHECK (status IN ('pending','processing','complete','hitl','failed')),

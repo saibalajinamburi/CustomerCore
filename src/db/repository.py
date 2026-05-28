@@ -121,6 +121,8 @@ class TicketRecord:
     channel: str
     raw_text: str                       # The original ticket text
     status: str = "pending"
+    customer_tier: str = "free"
+    masked_text: str | None = None
     external_ticket_id: str | None = None
     detected_language: str | None = None
     priority: str | None = None
@@ -274,6 +276,8 @@ class TicketRepository:
             "sentiment":             "sentiment",
             "churn_risk":            "churn_risk_score",
             "churn_risk_score":      "churn_risk_score",
+            "customer_tier":         "customer_tier",
+            "masked_text":           "masked_text",
             "constitutional_score":  "constitutional_score",
             "constitutional_passed": "constitutional_passed",
             "hitl_required":         "hitl_required",
@@ -397,7 +401,7 @@ class TicketRepository:
         try:
             query = (
                 sb.table("tickets")
-                .select("id,status,priority,category,channel,created_at,hitl_required")
+                .select("id,status,priority,category,channel,created_at,hitl_required,customer_id,customer_tier,masked_text")
                 .eq("tenant_id", self.tenant_id)
                 .order("created_at", desc=True)
                 .limit(limit)

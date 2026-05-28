@@ -8,6 +8,8 @@ from sklearn.metrics import roc_curve, auc, confusion_matrix, accuracy_score, f1
 import matplotlib
 matplotlib.use('Agg')  # Non-interactive backend
 import matplotlib.pyplot as plt
+import mlflow
+import mlflow.sklearn
 
 def train():
     print("Pre-training steps...")
@@ -53,86 +55,121 @@ def train():
     
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
     
-    print("Training Random Forest Churn Predictor...")
-    clf = RandomForestClassifier(random_state=42)
-    clf.fit(X_train, y_train)
+    # Setup MLflow Tracking
+    # If MLFLOW_TRACKING_URI is set, use it. Otherwise, default to local sqlite
+    tracking_uri = os.environ.get("MLFLOW_TRACKING_URI", "sqlite:///mlruns.db")
+    mlflow.set_tracking_uri(tracking_uri)
+    print(f"MLflow Tracking URI set to: {tracking_uri}")
     
-    y_pred = clf.predict(X_test)
-    y_proba = clf.predict_proba(X_test)[:, 1]
+    mlflow.set_experiment("CustomerCore-Churn")
     
-    # Compute metrics
-    fpr, tpr, _ = roc_curve(y_test, y_proba)
-    roc_auc = auc(fpr, tpr)
-    acc = accuracy_score(y_test, y_pred)
-    f1 = f1_score(y_test, y_pred)
-    rec = recall_score(y_test, y_pred)
-    prec = precision_score(y_test, y_pred)
-    
-    metrics = {
-        "auc": round(float(roc_auc), 3),
-        "accuracy": round(float(acc), 3),
-        "f1_score": round(float(f1), 3),
-        "recall": round(float(rec), 3),
-        "precision": round(float(prec), 3)
-    }
-    
-    print("Evaluated Metrics:", metrics)
-    
-    os.makedirs("data", exist_ok=True)
-    with open("data/metrics.json", "w") as f:
-        json.dump(metrics, f, indent=2)
+    # Start MLflow run
+    with mlflow.start_run(run_name="RandomForest-Baseline") as run:
+        print("Training Random Forest Churn Predictor...")
+        clf = RandomForestClassifier(random_state=42)
+        clf.fit(X_train, y_train)
         
-    # Generate Plots
-    print("Generating ROC Curve...")
-    plt.figure(figsize=(6, 5))
-    plt.plot(fpr, tpr, color='darkorange', lw=2, label=f'ROC curve (AUC = {roc_auc:.3f})')
-    plt.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--')
-    plt.xlim([0.0, 1.0])
-    plt.ylim([0.0, 1.05])
-    plt.xlabel('False Positive Rate')
-    plt.ylabel('True Positive Rate')
-    plt.title('Receiver Operating Characteristic (ROC)')
-    plt.legend(loc="lower right")
-    plt.tight_layout()
-    plt.savefig("data/roc_curve.png", dpi=150)
-    plt.close()
-    
-    print("Generating Confusion Matrix...")
-    cm = confusion_matrix(y_test, y_pred)
-    plt.figure(figsize=(5, 4))
-    plt.imshow(cm, interpolation='nearest', cmap=plt.cm.Blues)
-    plt.title('Confusion Matrix')
-    plt.colorbar()
-    tick_marks = np.arange(2)
-    plt.xticks(tick_marks, ['No Churn', 'Churn'])
-    plt.yticks(tick_marks, ['No Churn', 'Churn'])
-    
-    thresh = cm.max() / 2.
-    for i in range(cm.shape[0]):
-        for j in range(cm.shape[1]):
-            plt.text(j, i, format(cm[i, j], 'd'),
-                     ha="center", va="center",
-                     color="white" if cm[i, j] > thresh else "black")
-                     
-    plt.ylabel('True label')
-    plt.xlabel('Predicted label')
-    plt.tight_layout()
-    plt.savefig("data/confusion_matrix.png", dpi=150)
-    plt.close()
+        y_pred = clf.predict(X_test)
+        y_proba = clf.predict_proba(X_test)[:, 1]
+        
+        # Compute metrics
+        fpr, tpr, _ = roc_curve(y_test, y_proba)
+        roc_auc = auc(fpr, tpr)
+        acc = accuracy_score(y_test, y_pred)
+        f1 = f1_score(y_test, y_pred)
+        rec = recall_score(y_test, y_pred)
+        prec = precision_score(y_test, y_pred)
+        
+        metrics = {
+            "auc": round(float(roc_auc), 3),
+            "accuracy": round(float(acc), 3),
+            "f1_score": round(float(f1), 3),
+            "recall": round(float(rec), 3),
+            "precision": round(float(prec), 3)
+        }
+        
+        print("Evaluated Metrics:", metrics)
+        
+        # Log parameters to MLflow
+        mlflow.log_param("n_estimators", clf.n_estimators)
+        mlflow.log_param("criterion", clf.criterion)
+        mlflow.log_param("max_depth", clf.max_depth)
+        mlflow.log_param("min_samples_split", clf.min_samples_split)
+        mlflow.log_param("random_state", 42)
+        mlflow.log_param("test_size", 0.2)
+        
+        # Log metrics to MLflow
+        mlflow.log_metrics(metrics)
+        
+        os.makedirs("data", exist_ok=True)
+        with open("data/metrics.json", "w") as f:
+            json.dump(metrics, f, indent=2)
+            
+        # Generate Plots
+        print("Generating ROC Curve...")
+        plt.figure(figsize=(6, 5))
+        plt.plot(fpr, tpr, color='darkorange', lw=2, label=f'ROC curve (AUC = {roc_auc:.3f})')
+        plt.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--')
+        plt.xlim([0.0, 1.0])
+        plt.ylim([0.0, 1.05])
+        plt.xlabel('False Positive Rate')
+        plt.ylabel('True Positive Rate')
+        plt.title('Receiver Operating Characteristic (ROC)')
+        plt.legend(loc="lower right")
+        plt.tight_layout()
+        plt.savefig("data/roc_curve.png", dpi=150)
+        plt.close()
+        
+        print("Generating Confusion Matrix...")
+        cm = confusion_matrix(y_test, y_pred)
+        plt.figure(figsize=(5, 4))
+        plt.imshow(cm, interpolation='nearest', cmap=plt.cm.Blues)
+        plt.title('Confusion Matrix')
+        plt.colorbar()
+        tick_marks = np.arange(2)
+        plt.xticks(tick_marks, ['No Churn', 'Churn'])
+        plt.yticks(tick_marks, ['No Churn', 'Churn'])
+        
+        thresh = cm.max() / 2.
+        for i in range(cm.shape[0]):
+            for j in range(cm.shape[1]):
+                plt.text(j, i, format(cm[i, j], 'd'),
+                         ha="center", va="center",
+                         color="white" if cm[i, j] > thresh else "black")
+                         
+        plt.ylabel('True label')
+        plt.xlabel('Predicted label')
+        plt.tight_layout()
+        plt.savefig("data/confusion_matrix.png", dpi=150)
+        plt.close()
 
-    print("Generating Feature Importance Plot...")
-    importances = clf.feature_importances_
-    indices = np.argsort(importances)
-    plt.figure(figsize=(6, 4))
-    plt.title('Feature Importances')
-    plt.barh(range(len(indices)), importances[indices], color='b', align='center')
-    plt.yticks(range(len(indices)), [X.columns[i] for i in indices])
-    plt.xlabel('Relative Importance')
-    plt.tight_layout()
-    plt.savefig("data/feature_importance.png", dpi=150)
-    plt.close()
-    
-    print("Training completed successfully!")
+        print("Generating Feature Importance Plot...")
+        importances = clf.feature_importances_
+        indices = np.argsort(importances)
+        plt.figure(figsize=(6, 4))
+        plt.title('Feature Importances')
+        plt.barh(range(len(indices)), importances[indices], color='b', align='center')
+        plt.yticks(range(len(indices)), [X.columns[i] for i in indices])
+        plt.xlabel('Relative Importance')
+        plt.tight_layout()
+        plt.savefig("data/feature_importance.png", dpi=150)
+        plt.close()
+        
+        # Log artifacts (plots) to MLflow
+        mlflow.log_artifact("data/roc_curve.png", "plots")
+        mlflow.log_artifact("data/confusion_matrix.png", "plots")
+        mlflow.log_artifact("data/feature_importance.png", "plots")
+        
+        # Log and Register the model in MLflow Model Registry
+        print("Logging and registering model to MLflow Model Registry...")
+        mlflow.sklearn.log_model(
+            sk_model=clf,
+            artifact_path="model",
+            registered_model_name="customercore-churn-classifier"
+        )
+        
+        print("MLflow Logging and registration completed successfully!")
 
 if __name__ == "__main__":
     train()
+

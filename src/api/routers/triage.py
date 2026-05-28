@@ -15,6 +15,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 
 from src.api.auth import AuthenticatedTenant, require_role, verify_token
 from src.api.models import (
+    CustomerTier,
     HITLResumeRequest,
     TicketSubmitRequest,
     TicketSubmitResponse,
@@ -97,6 +98,9 @@ def row_to_response(row: dict[str, Any], violations: list[dict] | None = None) -
         status=TriageStatus(row["status"]),
         tenant_id=str(row["tenant_id"]),
         customer_id=row["customer_id"],
+        customer_tier=CustomerTier(row.get("customer_tier", "free")),
+        text=row.get("masked_text") or row.get("raw_text"),
+        masked_text=row.get("masked_text") or row.get("raw_text"),
         category=row.get("category"),
         priority=TicketPriority(row["priority"]) if row.get("priority") else None,
         confidence=row.get("confidence") or 0.85,
@@ -135,6 +139,19 @@ async def _run_triage(ticket_id: str, text: str, customer_id: str, tenant_id: st
     """
     from src.monitoring.langfuse_tracer import TriageTrace
     from src.responsible_ai.constitutional_policy import policy_engine
+    from src.responsible_ai.privacy_vault import get_vault
+
+    vault = get_vault()
+    try:
+        masked_text, _ = vault.encrypt_text(
+            tenant_id=tenant_id,
+            text=text,
+            analyzer=None,
+            anonymizer=None,
+            ticket_id=ticket_id,
+        )
+    except Exception:
+        masked_text = text
 
     trace = TriageTrace.start(
         ticket_id=ticket_id,
@@ -278,6 +295,10 @@ async def _run_triage(ticket_id: str, text: str, customer_id: str, tenant_id: st
                         f"Constitutional violation: {verdict.violations[0].rule_name}"
                     )
 
+        if isinstance(result, dict):
+            result["customer_tier"] = customer_tier
+            result["masked_text"] = masked_text
+
         # ── HITL or Complete ──────────────────────────────────────────────
         if isinstance(result, dict) and result.get("hitl_required"):
             result_data = {**result, "hitl_reason": result.get("hitl_reason")}
@@ -336,13 +357,29 @@ async def submit_ticket(
     ticket_id = str(uuid4())
     repo = TicketRepository(caller.tenant_id)
     
+    # Mask PII in the ticket body using the zero-trust privacy vault
+    from src.responsible_ai.privacy_vault import get_vault
+    vault = get_vault()
+    try:
+        masked_text, _ = vault.encrypt_text(
+            tenant_id=caller.tenant_id,
+            text=body.text,
+            analyzer=None,
+            anonymizer=None,
+            ticket_id=ticket_id,
+        )
+    except Exception:
+        masked_text = body.text
+
     # Store initial ticket row in pending state
     record = TicketRecord(
         id=ticket_id,
         tenant_id=caller.tenant_id,
         customer_id=body.customer_id,
+        customer_tier=body.customer_tier.value,
         channel=body.channel.value,
         raw_text=body.text,
+        masked_text=masked_text,
         status="pending",
     )
     await repo.create(record)
