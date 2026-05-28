@@ -86,14 +86,21 @@ jobs:
         echo "" >> report.md
         echo "### 🎨 Model Performance Visualization & Analytics" >> report.md
         echo "" >> report.md
-        echo "#### 📈 ROC Curve" >> report.md
-        cml publish data/roc_curve.png --md >> report.md
-        echo "" >> report.md
-        echo "#### 📊 Confusion Matrix" >> report.md
-        cml publish data/confusion_matrix.png --md >> report.md
-        echo "" >> report.md
-        echo "#### 🔍 Feature Importances" >> report.md
-        cml publish data/feature_importance.png --md >> report.md
+        if [ -f data/roc_curve.png ]; then
+          echo "#### 📈 ROC Curve" >> report.md
+          cml publish data/roc_curve.png --md >> report.md
+          echo "" >> report.md
+        fi
+        if [ -f data/confusion_matrix.png ]; then
+          echo "#### 📊 Confusion Matrix" >> report.md
+          cml publish data/confusion_matrix.png --md >> report.md
+          echo "" >> report.md
+        fi
+        if [ -f data/feature_importance.png ]; then
+          echo "#### 🔍 Feature Importances" >> report.md
+          cml publish data/feature_importance.png --md >> report.md
+          echo "" >> report.md
+        fi
         
         # Write to Github Action Step Summary for instant dashboard view
         cat report.md >> $GITHUB_STEP_SUMMARY

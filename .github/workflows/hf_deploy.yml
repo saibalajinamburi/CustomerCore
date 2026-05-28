@@ -10,31 +10,21 @@ jobs:
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
       with:
-        fetch-depth: 0
+        python-version: '3.12'
+        cache: 'pip'
 
-    - name: Prepare Hugging Face README and Dockerfile
+    - name: Install dependencies
       run: |
-        cp Dockerfile.hf Dockerfile
-        # Prepend Hugging Face metadata header to README.md
-        printf -- "---\ntitle: CustomerCore API\nemoji: 🚀\ncolorFrom: blue\ncolorTo: indigo\nsdk: docker\napp_port: 7860\npinned: false\n---\n" > temp_readme
-        cat README.md >> temp_readme
-        mv temp_readme README.md
-        # Configure git metadata
-        git config --global user.email "github-actions@github.com"
-        git config --global user.name "GitHub Actions"
-        git add Dockerfile README.md
-        git commit -m "deploy: sync Dockerfile and README for Hugging Face" || echo "No changes to commit"
+        python -m pip install --upgrade pip
+        pip install huggingface_hub
 
-    - name: Push to Hugging Face Spaces
+    - name: Deploy to Hugging Face Spaces
       env:
         HF_TOKEN: ${{ secrets.HF_TOKEN }}
         HF_SPACE: ${{ secrets.HF_SPACE }}
       run: |
-        if [ -z "$HF_TOKEN" ] || [ -z "$HF_SPACE" ]; then
-          echo "HF_TOKEN or HF_SPACE secrets are not configured. Skipping deployment."
-          exit 0
-        fi
-        
-        # Add Hugging Face remote and push main
-        git push --force https://hfuser:$HF_TOKEN@huggingface.co/spaces/$HF_SPACE HEAD:refs/heads/main
+        python src/ml/deploy_to_hf.py

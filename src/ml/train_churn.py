@@ -86,7 +86,7 @@ def train():
         run_name = f"{name}-Baseline"
         print(f"\n--- Training and evaluating {name} ---")
         
-        with mlflow.start_run(run_name=run_name) as run:
+        with mlflow.start_run(run_name=run_name):
             # Log dataset input context
             mlflow.log_input(mlflow_dataset, context="training")
             
@@ -230,9 +230,20 @@ def train():
     with open("data/metrics.json", "w") as f:
         json.dump(best_metrics, f, indent=2)
 
-    print(f"\n==========================================")
+    # Copy best model's plots to standard paths for CML reporting
+    import shutil
+    try:
+        shutil.copy(f"data/{best_model_name.lower()}_roc_curve.png", "data/roc_curve.png")
+        shutil.copy(f"data/{best_model_name.lower()}_confusion_matrix.png", "data/confusion_matrix.png")
+        if os.path.exists(f"data/{best_model_name.lower()}_feature_importance.png"):
+            shutil.copy(f"data/{best_model_name.lower()}_feature_importance.png", "data/feature_importance.png")
+        print("Best model plots copied to standard paths for CML reporting.")
+    except Exception as e:
+        print(f"Failed to copy standard plots: {e}")
+
+    print("\n==========================================")
     print(f"Best Model Selected: {best_model_name} (F1: {best_f1:.3f}) with Version: {best_version}")
-    print(f"==========================================")
+    print("==========================================")
     
     # Wait for the model version to finish creation in registry
     print("Waiting for model version registry propagation...")
