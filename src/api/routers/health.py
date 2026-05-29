@@ -134,7 +134,6 @@ async def readiness() -> JSONResponse:
 @router.post("/run-migrations", summary="Trigger database migrations")
 async def trigger_migrations() -> JSONResponse:
     import os
-    import psycopg2
     import traceback
     logs = []
     db_url = os.environ.get("SUPABASE_DB_URL")
@@ -145,6 +144,7 @@ async def trigger_migrations() -> JSONResponse:
         )
         
     try:
+        import psycopg2
         conn = psycopg2.connect(db_url, connect_timeout=5)
         conn.autocommit = True
         cursor = conn.cursor()
