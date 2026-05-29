@@ -15,6 +15,19 @@ def run_db_migrations():
         logger.warning("SUPABASE_DB_URL is not set. Skipping DDL migrations.")
         return
 
+    import urllib.parse
+    if "://" in db_url and "@" in db_url:
+        try:
+            prefix, rest = db_url.split("://", 1)
+            creds_part, host_part = rest.rsplit("@", 1)
+            if ":" in creds_part:
+                user, password = creds_part.split(":", 1)
+                unquoted_password = urllib.parse.unquote(password)
+                encoded_password = urllib.parse.quote_plus(unquoted_password)
+                db_url = f"{prefix}://{user}:{encoded_password}@{host_part}"
+        except Exception as parse_err:
+            logger.warning(f"Failed to pre-parse SUPABASE_DB_URL: {parse_err}")
+
     logger.info("Running database migration checks...")
     try:
         # Connect to Postgres

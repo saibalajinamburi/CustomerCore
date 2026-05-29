@@ -135,6 +135,7 @@ async def readiness() -> JSONResponse:
 async def trigger_migrations() -> JSONResponse:
     import os
     import traceback
+    import urllib.parse
     logs = []
     db_url = os.environ.get("SUPABASE_DB_URL")
     if not db_url:
@@ -142,6 +143,18 @@ async def trigger_migrations() -> JSONResponse:
             status_code=400,
             content={"status": "error", "message": "SUPABASE_DB_URL not set in env"}
         )
+
+    if "://" in db_url and "@" in db_url:
+        try:
+            prefix, rest = db_url.split("://", 1)
+            creds_part, host_part = rest.rsplit("@", 1)
+            if ":" in creds_part:
+                user, password = creds_part.split(":", 1)
+                unquoted_password = urllib.parse.unquote(password)
+                encoded_password = urllib.parse.quote_plus(unquoted_password)
+                db_url = f"{prefix}://{user}:{encoded_password}@{host_part}"
+        except Exception as parse_err:
+            logs.append(f"Failed to pre-parse SUPABASE_DB_URL: {parse_err}")
         
     try:
         import psycopg2
