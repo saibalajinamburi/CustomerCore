@@ -129,3 +129,64 @@ async def readiness() -> JSONResponse:
         content=body,
         status_code=200 if overall_ok else 503,
     )
+
+
+@router.post("/run-migrations", summary="Trigger database migrations")
+async def trigger_migrations() -> JSONResponse:
+    import os
+    import psycopg2
+    import traceback
+    logs = []
+    db_url = os.environ.get("SUPABASE_DB_URL")
+    if not db_url:
+        return JSONResponse(
+            status_code=400,
+            content={"status": "error", "message": "SUPABASE_DB_URL not set in env"}
+        )
+        
+    try:
+        conn = psycopg2.connect(db_url, connect_timeout=5)
+        conn.autocommit = True
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            ALTER TABLE tickets 
+            ADD COLUMN IF NOT EXISTS customer_tier TEXT NOT NULL DEFAULT 'free' 
+            CHECK (customer_tier IN ('free','starter','growth','enterprise','vip'));
+        """)
+        logs.append("Executed customer_tier migration")
+        
+        cursor.execute("""
+            ALTER TABLE tickets 
+            ADD COLUMN IF NOT EXISTS masked_text TEXT;
+        """)
+        logs.append("Executed masked_text migration")
+        
+        cursor.execute("SELECT pg_notify('pgrst', 'reload schema');")
+        logs.append("Reloaded PostgREST schema cache")
+        
+        cursor.close()
+        conn.close()
+        return JSONResponse(
+            status_code=200,
+            content={"status": "success", "logs": logs}
+        )
+    except Exception as e:
+        tb = traceback.format_exc()
+        # Redact password if present in db_url for safety
+        redacted_db_url = None
+        if db_url:
+            parts = db_url.split("@")
+            if len(parts) > 1:
+                redacted_db_url = "postgresql://***@" + parts[1]
+            else:
+                redacted_db_url = db_url[:15] + "..."
+        return JSONResponse(
+            status_code=500,
+            content={
+                "status": "error",
+                "message": str(e),
+                "traceback": tb,
+                "db_url_redacted": redacted_db_url
+            }
+        )
