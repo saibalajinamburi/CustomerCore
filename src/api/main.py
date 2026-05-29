@@ -131,6 +131,13 @@ async def lifespan(app: FastAPI):
              env=os.getenv("APP_ENV", "development"),
              version="1.0.0")
 
+    # Run database migration checks
+    try:
+        from src.db.migrations import run_db_migrations
+        run_db_migrations()
+    except Exception as exc:
+        log.warning("Database migration checks failed (non-fatal)", error=str(exc))
+
     # Register Langfuse as LiteLLM callback (Phase 11 — LLM Observability)
     try:
         from src.monitoring.langfuse_tracer import setup_litellm_tracing
