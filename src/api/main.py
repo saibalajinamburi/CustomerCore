@@ -334,6 +334,7 @@ def create_app() -> FastAPI:
 # ─────────────────────────────────────────────────────────────────────────────
 # Application instance (used by uvicorn)
 # ─────────────────────────────────────────────────────────────────────────────
+# Trigger rebuild to load new secrets: 2026-05-29T12:57:00
 
 app = create_app()
 
