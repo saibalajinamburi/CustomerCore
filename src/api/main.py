@@ -266,6 +266,30 @@ def create_app() -> FastAPI:
         return response
 
     # ── Global Exception Handlers ───────────────────────────────────────────
+    from src.db.repository import RepositoryError
+
+    @app.exception_handler(RepositoryError)
+    async def repository_error_handler(request: Request, exc: RepositoryError) -> JSONResponse:
+        """
+        Catch repository exceptions (database, Supabase, connections).
+        Returns detailed exception details so we can debug cloud issues in real-time.
+        """
+        request_id = request.headers.get("X-Request-ID", "unknown")
+        log.exception(
+            "Repository error",
+            path=request.url.path,
+            request_id=request_id,
+            error=str(exc),
+        )
+        return JSONResponse(
+            status_code=500,
+            content={
+                "error": "Database repository error",
+                "request_id": request_id,
+                "detail": str(exc),
+            },
+        )
+
     @app.exception_handler(Exception)
     async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
         """
@@ -285,7 +309,7 @@ def create_app() -> FastAPI:
             content={
                 "error": "Internal server error",
                 "request_id": request_id,
-                "detail": str(exc) if os.getenv("APP_ENV") == "development" else None,
+                "detail": str(exc),  # Expose error detail for cloud debugging
             },
         )
 

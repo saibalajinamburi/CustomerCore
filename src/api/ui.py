@@ -1307,7 +1307,16 @@ HTML_CONTENT = """<!DOCTYPE html>
                 });
 
                 if(!response.ok) {
-                    throw new Error(`HTTP error ${response.status}`);
+                    let errMsg = `HTTP error ${response.status} ${response.statusText}`;
+                    try {
+                        const errData = await response.json();
+                        if (errData && errData.detail) {
+                            errMsg += ` - ${errData.detail}`;
+                        } else if (errData && errData.error) {
+                            errMsg += ` - ${errData.error}`;
+                        }
+                    } catch(_) {}
+                    throw new Error(errMsg);
                 }
 
                 const tickets = await response.json();
@@ -1336,7 +1345,7 @@ HTML_CONTENT = """<!DOCTYPE html>
                 });
             } catch(e) {
                 console.error("Load history failed", e);
-                tbody.innerHTML = `<tr><td colspan="7" class="empty-state">Failed to load ticket history. Ensure active tenant matches context.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="7" class="empty-state" style="color: var(--danger); font-weight: 500;">Failed to load ticket history.<br><span style="font-size: 12px; font-family: monospace; color: var(--text-muted); display: block; margin-top: 8px;">${e.message}</span></td></tr>`;
             }
         }
 
@@ -1370,7 +1379,16 @@ HTML_CONTENT = """<!DOCTYPE html>
                 });
 
                 if(!response.ok) {
-                    throw new Error(`HTTP error ${response.status}`);
+                    let errMsg = `HTTP error ${response.status} ${response.statusText}`;
+                    try {
+                        const errData = await response.json();
+                        if (errData && errData.detail) {
+                            errMsg += ` - ${errData.detail}`;
+                        } else if (errData && errData.error) {
+                            errMsg += ` - ${errData.error}`;
+                        }
+                    } catch(_) {}
+                    throw new Error(errMsg);
                 }
 
                 const tickets = await response.json();
@@ -1387,7 +1405,7 @@ HTML_CONTENT = """<!DOCTYPE html>
                     const textSnip = t.masked_text ? (t.masked_text.slice(0, 50) + "...") : (t.text.slice(0, 50) + "...");
                     
                     const violations = t.constitutional_violations && t.constitutional_violations.length > 0 
-                        ? t.constitutional_violations.map(v => `${v.rule_id}: ${v.reason}`).join(", ")
+                        ? t.constitutional_violations.map(v => `${v.rule_id || v.rule}: ${v.reason || v.explanation || 'Safety policy trigger'}`).join(", ")
                         : "PII protection warning / Policy trigger";
 
                     tr.innerHTML = `
@@ -1403,7 +1421,11 @@ HTML_CONTENT = """<!DOCTYPE html>
                 });
             } catch(e) {
                 console.error("Load HITL list failed", e);
-                tbody.innerHTML = `<tr><td colspan="5" class="empty-state">Failed to load HITL reviews. Ensure role is 'manager' or 'admin'.</td></tr>`;
+                let displayMsg = "Failed to load HITL reviews. Ensure role is 'manager' or 'admin'.";
+                if (e.message.includes("403")) {
+                    displayMsg = "Access Denied: Only Manager or Admin role can access HITL reviews.";
+                }
+                tbody.innerHTML = `<tr><td colspan="5" class="empty-state" style="color: var(--danger); font-weight: 500;">${displayMsg}<br><span style="font-size: 12px; font-family: monospace; color: var(--text-muted); display: block; margin-top: 8px;">${e.message}</span></td></tr>`;
             }
         }
 
@@ -1481,6 +1503,12 @@ HTML_CONTENT = """<!DOCTYPE html>
                 document.getElementById('health-config-log').innerText = configText;
             } catch(e) {
                 showToast("Failed to fetch service health", true);
+                document.getElementById('health-redis').innerText = "Unreachable";
+                document.getElementById('health-redis').className = "status-badge error";
+                document.getElementById('health-redpanda').innerText = "Unreachable";
+                document.getElementById('health-redpanda').className = "status-badge error";
+                document.getElementById('health-supabase').innerText = "Unreachable";
+                document.getElementById('health-supabase').className = "status-badge error";
             }
         }
 
