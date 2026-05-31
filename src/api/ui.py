@@ -1454,19 +1454,22 @@ HTML_CONTENT = """<!DOCTYPE html>
                 
                 // Redis
                 const redisEl = document.getElementById('health-redis');
-                redisEl.innerText = data.services.redis ? "Connected" : "Offline";
-                redisEl.className = data.services.redis ? "status-badge ok" : "status-badge error";
+                const redisConnected = data.services.redis === "ok";
+                redisEl.innerText = redisConnected ? "Connected" : "Offline";
+                redisEl.className = redisConnected ? "status-badge ok" : "status-badge error";
 
                 // Redpanda
                 const pandaEl = document.getElementById('health-redpanda');
-                pandaEl.innerText = data.services.redpanda ? "Active" : "Serverless Mode (Active Fallback)";
-                pandaEl.className = data.services.redpanda ? "status-badge ok" : "status-badge info";
-                pandaEl.title = data.services.redpanda ? "Redpanda event broker is online" : "Broker is offline in serverless space; system gracefully fell back to FastAPI BackgroundTasks.";
+                const redpandaActive = data.services.redpanda === "ok";
+                pandaEl.innerText = redpandaActive ? "Active" : "Serverless Mode (Active Fallback)";
+                pandaEl.className = redpandaActive ? "status-badge ok" : "status-badge info";
+                pandaEl.title = redpandaActive ? "Redpanda event broker is online" : "Broker is offline in serverless space; system gracefully fell back to FastAPI BackgroundTasks.";
 
                 // Supabase
                 const subaEl = document.getElementById('health-supabase');
-                subaEl.innerText = data.services.supabase ? "Connected" : "Offline";
-                subaEl.className = data.services.supabase ? "status-badge ok" : "status-badge error";
+                const supabaseConnected = data.services.supabase === "ok";
+                subaEl.innerText = supabaseConnected ? "Connected" : "Offline";
+                subaEl.className = supabaseConnected ? "status-badge ok" : "status-badge error";
 
                 // Config log
                 let configText = `[CustomerCore Microservice Configuration Settings]\n`;
