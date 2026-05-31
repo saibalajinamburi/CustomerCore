@@ -915,7 +915,7 @@ HTML_CONTENT = """<!DOCTYPE html>
             <div class="glass-card">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
                     <h3 style="font-family: 'Outfit'; font-size: 18px;">Flagged HITL Reviews</h3>
-                    <button class="btn" style="padding: 8px 16px;" onclick="loadHITLList()">🔄 Fetch Pending</button>
+                    <button id="btn-fetch-hitl" class="btn" style="padding: 8px 16px;" onclick="loadHITLList()">🔄 Fetch Pending</button>
                 </div>
                 <div class="table-container">
                     <table>
@@ -1407,6 +1407,11 @@ HTML_CONTENT = """<!DOCTYPE html>
         // Load HITL Pending list
         async function loadHITLList() {
             const tbody = document.getElementById('hitl-table-body');
+            const btn = document.getElementById('btn-fetch-hitl');
+            if (btn) {
+                btn.disabled = true;
+                btn.innerText = "🔄 Fetching...";
+            }
             
             try {
                 const response = await fetch('/api/v1/triage', {
@@ -1433,6 +1438,10 @@ HTML_CONTENT = """<!DOCTYPE html>
 
                 if(hitlTickets.length === 0) {
                     tbody.innerHTML = `<tr><td colspan="5" class="empty-state">No tickets pending HITL review.</td></tr>`;
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.innerText = "🔄 Refresh List";
+                    }
                     return;
                 }
 
@@ -1456,6 +1465,10 @@ HTML_CONTENT = """<!DOCTYPE html>
                     `;
                     tbody.appendChild(tr);
                 });
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerText = "🔄 Refresh List";
+                }
             } catch(e) {
                 console.error("Load HITL list failed", e);
                 let displayMsg = "Failed to load HITL reviews. The server or database may be unreachable.";
@@ -1465,6 +1478,10 @@ HTML_CONTENT = """<!DOCTYPE html>
                     displayMsg = "Authentication Failed: Session token has expired or is invalid.";
                 }
                 tbody.innerHTML = `<tr><td colspan="5" class="empty-state" style="color: var(--danger); font-weight: 500;">${displayMsg}<br><span style="font-size: 12px; font-family: monospace; color: var(--text-muted); display: block; margin-top: 8px;">${e.message}</span></td></tr>`;
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerText = "🔄 Fetch Pending";
+                }
             }
         }
 
