@@ -153,7 +153,6 @@ def churn_agent_node(state: AgentState) -> AgentState:
     log.info("churn_agent_done", sla_breach_risk=sla_breach_risk, churn_risk=churn_risk, models_used=models_used)
     
     return {
-        **state,
         "sla_breach_risk": sla_breach_risk,
         "churn_risk": churn_risk,
         "current_step": "churn_agent",

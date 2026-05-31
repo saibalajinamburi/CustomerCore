@@ -9,6 +9,24 @@ class TicketInput(TypedDict):
     tenant_id: str
     customer_tier: str
 
+def merge_models(left: Optional[List[str]], right: Optional[List[str]]) -> List[str]:
+    left_list = left or []
+    right_list = right or []
+    res = list(left_list)
+    for x in right_list:
+        if x not in res:
+            res.append(x)
+    return res
+
+def merge_steps(left: Optional[str], right: Optional[str]) -> str:
+    if not left:
+        return right or ""
+    if not right:
+        return left
+    if right in left:
+        return left
+    return f"{left},{right}"
+
 class AgentState(TypedDict):
     # Input
     ticket: TicketInput
@@ -27,10 +45,10 @@ class AgentState(TypedDict):
     incident_detected: Optional[bool]
     hitl_required: Optional[bool]
     hitl_reason: Optional[str]
-    models_used: Optional[List[str]]
+    models_used: Annotated[Optional[List[str]], merge_models]
 
     # Workflow metadata
-    current_step: Optional[str]
+    current_step: Annotated[Optional[str], merge_steps]
     error: Optional[str]
     final_output: Optional[TriageOutput]
 

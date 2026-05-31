@@ -61,7 +61,6 @@ def incident_agent_node(state: AgentState) -> AgentState:
     log.info("incident_agent_done", incident_detected=incident_detected, routing_team=routing_team)
     
     return {
-        **state,
         "incident_detected": incident_detected,
         "routing_team": routing_team,
         "current_step": "incident_agent",

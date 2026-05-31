@@ -74,12 +74,24 @@ workflow.add_node("hitl", hitl_agent_node)
 workflow.add_node("hitl_interrupt", hitl_interrupt_node)
 workflow.add_node("finalize", finalize_node)
 
-# 2. Add sequential transitions
+# 2. Add structural parallel concurrency (Phase 15 - Latency Optimization)
+# Step 1: Run 'classify' and 'memory' concurrently
 workflow.add_edge(START, "classify")
-workflow.add_edge("classify", "memory")
+workflow.add_edge(START, "memory")
+
+# Step 2: Once 'classify' and 'memory' are both complete, run 'rag', 'churn', and 'incident' concurrently
+workflow.add_edge("classify", "rag")
 workflow.add_edge("memory", "rag")
-workflow.add_edge("rag", "churn")
-workflow.add_edge("churn", "incident")
+
+workflow.add_edge("classify", "churn")
+workflow.add_edge("memory", "churn")
+
+workflow.add_edge("classify", "incident")
+workflow.add_edge("memory", "incident")
+
+# Step 3: Join the concurrent branches from 'rag', 'churn', and 'incident' at 'hitl'
+workflow.add_edge("rag", "hitl")
+workflow.add_edge("churn", "hitl")
 workflow.add_edge("incident", "hitl")
 
 # 3. Add conditional Human-in-the-loop gating

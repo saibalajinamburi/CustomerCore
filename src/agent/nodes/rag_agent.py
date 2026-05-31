@@ -168,7 +168,6 @@ def rag_agent_node(state: AgentState) -> AgentState:
             
             log.info("rag_agent_completed_successfully", model=response.model_used)
             return {
-                **state,
                 "summary": summary,
                 "suggested_resolution": suggested_resolution,
                 "kb_citations": valid_citations,
@@ -195,7 +194,6 @@ def rag_agent_node(state: AgentState) -> AgentState:
     models_used.append("heuristic-rag-fallback-v1.0")
     
     return {
-        **state,
         "summary": summary,
         "suggested_resolution": suggested_resolution,
         "kb_citations": kb_citations,

@@ -15,7 +15,6 @@ def memory_agent_node(state: AgentState) -> AgentState:
 
     log.info("memory_agent_done", customer_id=customer_id, memories_recalled=len(memories))
     return {
-        **state,
         "recalled_memories": memories,
         "current_step": "memory_agent",
     }

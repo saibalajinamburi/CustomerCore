@@ -134,7 +134,6 @@ def classify_agent_node(state: AgentState) -> AgentState:
     log.info("classify_agent_done", category=category, priority=priority, models_used=models_used)
     
     return {
-        **state,
         "category": category,
         "priority": priority,
         "current_step": "classify_agent",
