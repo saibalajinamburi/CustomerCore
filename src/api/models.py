@@ -269,6 +269,7 @@ class TriageResultResponse(BaseModel):
     created_at: datetime = Field(default_factory=datetime.utcnow)
     completed_at: datetime | None = None
     processing_ms: int | None = Field(None, description="Total triage latency in milliseconds.")
+    error_message: str | None = Field(None, description="Detailed error message if processing failed.")
 
 
 class HealthResponse(BaseModel):

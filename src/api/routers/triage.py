@@ -123,6 +123,7 @@ def row_to_response(row: dict[str, Any], violations: list[dict] | None = None) -
         created_at=created_at or datetime.utcnow(),
         completed_at=completed_at,
         processing_ms=processing_ms,
+        error_message=row.get("error_message"),
     )
 
 

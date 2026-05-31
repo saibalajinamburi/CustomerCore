@@ -1215,8 +1215,16 @@ HTML_CONTENT = """<!DOCTYPE html>
 
                     const data = await response.json();
                     
-                    if(data.status !== "pending" || attempts >= maxAttempts) {
+                    if (data.status === "processing") {
+                        document.getElementById('metric-resolution').innerText = `Triage active: Supervisor routing & agent network running (attempt ${attempts}/15)...`;
+                    }
+                    
+                    if(data.status !== "pending" && data.status !== "processing" || attempts >= maxAttempts) {
                         clearInterval(pollInterval);
+                        if (attempts >= maxAttempts && (data.status === "pending" || data.status === "processing")) {
+                            data.status = "failed";
+                            data.error_message = "Triage pipeline execution timed out after 15 seconds. The supervisor did not complete in time.";
+                        }
                         displayTriageResults(data);
                         btn.disabled = false;
                         btn.innerText = "Dispatch to Triage Pipeline";
@@ -1234,6 +1242,35 @@ HTML_CONTENT = """<!DOCTYPE html>
 
         // Display results in dashboard metrics cards
         function displayTriageResults(data) {
+            if (data.status === "failed") {
+                const priorityEl = document.getElementById('metric-priority');
+                priorityEl.innerText = "FAILED";
+                priorityEl.className = "metric-value priority-badge priority-critical";
+
+                document.getElementById('metric-routing').innerText = "Aborted";
+                document.getElementById('metric-outage').innerText = "Error";
+                document.getElementById('metric-churn').innerText = "N/A";
+                document.getElementById('churn-progress').style.width = "0%";
+
+                const resolutionEl = document.getElementById('metric-resolution');
+                resolutionEl.innerHTML = `
+                    <div style="color: var(--danger); font-weight: 700; font-size: 15px; margin-bottom: 8px;">Triage Pipeline Execution Failed ❌</div>
+                    <div style="font-family: monospace; background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.2); padding: 12px; border-radius: 8px; color: #fca5a5; font-size: 12.5px; margin-bottom: 12px; overflow-x: auto; white-space: pre-wrap; line-height: 1.4;">${data.error_message || 'An unexpected exception occurred.'}</div>
+                    <div style="font-size: 12px; color: var(--text-muted);">
+                        <strong>Next Steps:</strong> Check system logs, verify Supabase credentials/IP reachability, and check the status of external LLM endpoints (e.g. OpenRouter key balance).
+                    </div>
+                `;
+
+                document.getElementById('metric-pii-log').innerText = `[Pipeline Aborted]\n- Ticket ID: ${data.ticket_id || '--'}\n- Status: Failed\n- Error: ${data.error_message || 'unknown'}`;
+                
+                const safetyEl = document.getElementById('safety-indicator');
+                const safetyText = document.getElementById('safety-text');
+                safetyEl.className = "safety-banner safety-blocked";
+                safetyText.innerText = "🛡️ AI Compliance Check: Aborted due to system error.";
+                safetyEl.style.display = "flex";
+                return;
+            }
+
             // Priority
             const priorityVal = data.priority || "Low";
             const priorityEl = document.getElementById('metric-priority');

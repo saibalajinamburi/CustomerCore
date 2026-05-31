@@ -401,7 +401,7 @@ class TicketRepository:
         try:
             query = (
                 sb.table("tickets")
-                .select("id,status,priority,category,channel,created_at,hitl_required,customer_id,customer_tier,masked_text")
+                .select("*")
                 .eq("tenant_id", self.tenant_id)
                 .order("created_at", desc=True)
                 .limit(limit)
