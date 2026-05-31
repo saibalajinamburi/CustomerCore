@@ -1098,6 +1098,14 @@ HTML_CONTENT = """<!DOCTYPE html>
             adjustSelectWidth(tenantEl);
             adjustSelectWidth(roleEl);
             
+            // Immediately enforce HITL access restriction if role is not manager/admin
+            if (role !== "manager" && role !== "admin") {
+                const tbody = document.getElementById('hitl-table-body');
+                if (tbody) {
+                    tbody.innerHTML = `<tr><td colspan="5" class="empty-state" style="color: var(--danger); font-weight: 500;">Access Denied: Only Manager or Admin role can access HITL reviews.</td></tr>`;
+                }
+            }
+            
             const authBadge = document.getElementById('auth-status');
             const authText = document.getElementById('auth-status-text');
             const sessionDot = document.getElementById('session-dot');
@@ -1408,6 +1416,18 @@ HTML_CONTENT = """<!DOCTYPE html>
         async function loadHITLList() {
             const tbody = document.getElementById('hitl-table-body');
             const btn = document.getElementById('btn-fetch-hitl');
+            
+            // Strict Role-Based Access Control in the Frontend
+            const role = document.getElementById('widget-role').value;
+            if (role !== "manager" && role !== "admin") {
+                tbody.innerHTML = `<tr><td colspan="5" class="empty-state" style="color: var(--danger); font-weight: 500;">Access Denied: Only Manager or Admin role can access HITL reviews.</td></tr>`;
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerText = "🔄 Fetch Pending";
+                }
+                return;
+            }
+
             if (btn) {
                 btn.disabled = true;
                 btn.innerText = "🔄 Fetching...";
