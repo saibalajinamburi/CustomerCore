@@ -59,6 +59,8 @@ class RetrievedDoc:
     ticket_id: str = ""
     category: str = ""
     priority: str = ""
+    suggested_resolution: str = ""
+    summary: str = ""
     score: float = 0.0
     source: str = ""        # "dense" | "sparse" | "fused"
 
@@ -173,6 +175,8 @@ class TenantBM25Index:
                 ticket_id=meta.get("ticket_id", ""),
                 category=meta.get("category", ""),
                 priority=meta.get("priority", ""),
+                suggested_resolution=meta.get("suggested_resolution", ""),
+                summary=meta.get("summary", ""),
                 score=float(scores[idx]),
                 source="sparse",
             ))
@@ -228,6 +232,8 @@ class TenantChromaRetriever:
                 "ticket_id": metadata.get("ticket_id", ""),
                 "category": metadata.get("category", ""),
                 "priority": metadata.get("priority", ""),
+                "suggested_resolution": metadata.get("suggested_resolution", ""),
+                "summary": metadata.get("summary", ""),
             }],
         )
 
@@ -272,6 +278,8 @@ class TenantChromaRetriever:
                 ticket_id=meta.get("ticket_id", ""),
                 category=meta.get("category", ""),
                 priority=meta.get("priority", ""),
+                suggested_resolution=meta.get("suggested_resolution", ""),
+                summary=meta.get("summary", ""),
                 score=score,
                 source="dense",
             ))

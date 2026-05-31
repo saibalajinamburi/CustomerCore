@@ -28,6 +28,7 @@ def get_redis_client():
 
 def lookup_cache(tenant_id: str, body: str) -> dict | None:
     """Look up ticket resolution in Redis semantic cache or local fallback."""
+    # 1. L1 Cache: Exact Match Lookup (high-speed fallback)
     key_hash = hashlib.sha256(f"{tenant_id}:{body.strip()}".encode("utf-8")).hexdigest()
     cache_key = f"cc:semcache:{key_hash}"
     
@@ -36,15 +37,42 @@ def lookup_cache(tenant_id: str, body: str) -> dict | None:
         try:
             cached_val = redis_client.get(cache_key)
             if cached_val:
-                log.info("semantic_cache_hit_redis", tenant_id=tenant_id)
+                log.info("exact_cache_hit_redis", tenant_id=tenant_id)
                 return json.loads(cached_val)
         except Exception as e:
             log.warning("redis_lookup_failed", error=str(e))
             
-    # Fallback to local in-memory dict
+    # Fallback to local in-memory dict for exact matches
     if cache_key in _local_semantic_cache:
-        log.info("semantic_cache_hit_local", tenant_id=tenant_id)
+        log.info("exact_cache_hit_local", tenant_id=tenant_id)
         return _local_semantic_cache[cache_key]
+        
+    # 2. L2 Cache: True Semantic Match Lookup (vector search in ChromaDB)
+    try:
+        from src.rag.hybrid_retriever import get_retriever
+        retriever = get_retriever()
+        similar_docs = retriever.dense.search(tenant_id, body, k=1)
+        if similar_docs:
+            doc = similar_docs[0]
+            # ChromaDB Cosine similarity score is 1.0 - dist.
+            # score >= 0.96 indicates extremely high semantic equivalence (virtually identical).
+            if doc.score >= 0.96:
+                res = doc.suggested_resolution
+                sum_text = doc.summary
+                if res and sum_text:
+                    log.info(
+                        "semantic_cache_hit_chromadb",
+                        tenant_id=tenant_id,
+                        similar_ticket_id=doc.ticket_id,
+                        score=round(doc.score, 4),
+                    )
+                    return {
+                        "summary": sum_text,
+                        "suggested_resolution": res,
+                        "kb_citations": [f"TICKET-{doc.ticket_id.upper()}"],
+                    }
+    except Exception as e:
+        log.warning("semantic_cache_chromadb_failed", error=str(e))
         
     return None
 
@@ -78,7 +106,6 @@ def rag_agent_node(state: AgentState) -> AgentState:
     if cached_result:
         models_used.append("redis-semantic-cache-v1")
         return {
-            **state,
             "summary": cached_result["summary"],
             "suggested_resolution": cached_result["suggested_resolution"],
             "kb_citations": cached_result["kb_citations"],
@@ -103,8 +130,16 @@ def rag_agent_node(state: AgentState) -> AgentState:
     lang = detect_language(body)
     lang_display = SUPPORTED_LANGUAGES.get(lang, "English")
     
-    # 4. Invoke cloud LLM via LiteLLM client wrapper
+    # 4. Invoke LLM via SLA-Aware Multi-Model Routing
     client = get_client()
+    
+    category = state.get("category", "other")
+    priority = state.get("priority", "medium")
+    
+    # Determine model tier: Routine vs Complex tickets
+    # Complex tickets (priority high/critical, or category security/incident/billing) use frontier cloud model (call_cloud).
+    # Routine tickets (all others) use fast local/cloud model (call_local).
+    is_complex = priority in ("high", "critical") or category in ("security", "incident", "billing")
     
     system_prompt = (
         "You are an expert enterprise support triage agent. Your job is to analyze the support ticket "
@@ -126,7 +161,12 @@ def rag_agent_node(state: AgentState) -> AgentState:
     ]
     
     try:
-        response = client.call_cloud(messages=messages, temperature=0.1)
+        if is_complex:
+            log.info("routing_complex_ticket_to_frontier_tier", category=category, priority=priority)
+            response = client.call_cloud(messages=messages, temperature=0.1)
+        else:
+            log.info("routing_routine_ticket_to_fast_tier", category=category, priority=priority)
+            response = client.call_local(messages=messages, temperature=0.1)
         if response.success:
             models_used.append(response.model_used)
             # Parse the JSON response

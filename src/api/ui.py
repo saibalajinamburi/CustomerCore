@@ -1458,9 +1458,11 @@ HTML_CONTENT = """<!DOCTYPE html>
                 });
             } catch(e) {
                 console.error("Load HITL list failed", e);
-                let displayMsg = "Failed to load HITL reviews. Ensure role is 'manager' or 'admin'.";
+                let displayMsg = "Failed to load HITL reviews. The server or database may be unreachable.";
                 if (e.message.includes("403")) {
                     displayMsg = "Access Denied: Only Manager or Admin role can access HITL reviews.";
+                } else if (e.message.includes("401")) {
+                    displayMsg = "Authentication Failed: Session token has expired or is invalid.";
                 }
                 tbody.innerHTML = `<tr><td colspan="5" class="empty-state" style="color: var(--danger); font-weight: 500;">${displayMsg}<br><span style="font-size: 12px; font-family: monospace; color: var(--text-muted); display: block; margin-top: 8px;">${e.message}</span></td></tr>`;
             }

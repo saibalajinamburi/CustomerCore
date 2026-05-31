@@ -40,13 +40,10 @@ logger = logging.getLogger(__name__)
 # ── Model Identifiers ──────────────────────────────────────────────────────────
 # LiteLLM uses provider/model_name format
 LOCAL_MODEL = os.environ.get("LLM_DEFAULT_LOCAL", "ollama/gemma3:4b")
-CLOUD_MODEL = os.environ.get(
-    "LLM_DEFAULT_CLOUD",
-    # Verified working free/low-cost OpenRouter models (benchmarked 2026-05-22):
-    #   openrouter/google/gemini-2.5-flash           — 0.5s, superb speed, excellent quality
-    #   openrouter/meta-llama/llama-3.1-8b-instruct  — 7.0s, excellent quality
-    "openrouter/google/gemini-2.5-flash"
-)
+FAST_CLOUD_MODEL = os.environ.get("LLM_FAST_CLOUD", "openrouter/google/gemini-2.5-flash")
+FRONTIER_CLOUD_MODEL = os.environ.get("LLM_FRONTIER_CLOUD", "openrouter/anthropic/claude-3.5-sonnet")
+
+CLOUD_MODEL = os.environ.get("LLM_DEFAULT_CLOUD", FRONTIER_CLOUD_MODEL)
 OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
 OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
 
@@ -130,9 +127,11 @@ class LLMClient:
         self,
         local_model: str = LOCAL_MODEL,
         cloud_model: str = CLOUD_MODEL,
+        fast_cloud_model: str = FAST_CLOUD_MODEL,
     ):
         self.local_model = local_model
         self.cloud_model = cloud_model
+        self.fast_cloud_model = fast_cloud_model
 
     def _call(
         self,
@@ -155,6 +154,13 @@ class LLMClient:
                 success=False,
                 error="litellm not installed",
             )
+
+        # Dynamic fallback to fast cloud model in cloud/production environments
+        is_cloud = os.environ.get("APP_ENV") == "production" or "SPACE_ID" in os.environ
+        if provider == "local" and is_cloud:
+            logger.info("Ollama not available in cloud environment. Dynamically falling back to fast cloud model: %s", self.fast_cloud_model)
+            provider = "cloud"
+            model = self.fast_cloud_model
 
         # Configure Ollama base URL for local calls
         api_base = OLLAMA_BASE_URL if provider == "local" else None
@@ -202,6 +208,21 @@ class LLMClient:
             )
 
         except Exception as e:
+            # Dynamic fallback to fast cloud model on connection/runtime failure
+            if provider == "local":
+                logger.warning(
+                    "Local Ollama call failed. Dynamically falling back to fast cloud model: %s. Error: %s",
+                    self.fast_cloud_model,
+                    e
+                )
+                return self.call_cloud(
+                    messages=messages,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    timeout=timeout,
+                    model=self.fast_cloud_model,
+                )
+
             latency_ms = (time.perf_counter() - t0) * 1000
             logger.error("LLM call failed: model=%s error=%s", model, e)
             return LLMResponse(
@@ -219,10 +240,11 @@ class LLMClient:
         temperature: float = 0.1,
         max_tokens: int = 512,
         timeout: float = 30.0,
+        model: Optional[str] = None,
     ) -> LLMResponse:
-        """Call the local Ollama model. Zero cost. Data never leaves the machine."""
+        """Call the local Ollama model (falls back to fast cloud model dynamically if unavailable)."""
         return self._call(
-            model=self.local_model,
+            model=model or self.local_model,
             messages=messages,
             provider="local",
             temperature=temperature,
@@ -236,16 +258,17 @@ class LLMClient:
         temperature: float = 0.2,
         max_tokens: int = 1024,
         timeout: float = 60.0,
+        model: Optional[str] = None,
     ) -> LLMResponse:
         """Call the cloud frontier model via OpenRouter. Higher cost, higher capability."""
         if not OPENROUTER_API_KEY:
             logger.warning(
                 "OPENROUTER_API_KEY not set — falling back to local model for cloud call"
             )
-            return self.call_local(messages, temperature, max_tokens, timeout)
+            return self.call_local(messages, temperature, max_tokens, timeout, model=model)
 
         return self._call(
-            model=self.cloud_model,
+            model=model or self.cloud_model,
             messages=messages,
             provider="cloud",
             temperature=temperature,

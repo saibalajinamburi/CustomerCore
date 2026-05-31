@@ -300,6 +300,28 @@ async def _run_triage(ticket_id: str, text: str, customer_id: str, tenant_id: st
             result["customer_tier"] = customer_tier
             result["masked_text"] = masked_text
 
+        # ── Index into Graph-RAG / Vector DB for Semantic Caching ──────────
+        if isinstance(result, dict):
+            try:
+                import structlog
+                from src.rag.graph_rag import get_engine
+                engine = get_engine()
+                engine.index_ticket(
+                    tenant_id=tenant_id,
+                    ticket_id=ticket_id,
+                    text=text,
+                    metadata={
+                        "category": result.get("category", "general"),
+                        "priority": result.get("priority", "medium"),
+                        "suggested_resolution": result.get("suggested_resolution", ""),
+                        "summary": result.get("summary", ""),
+                    }
+                )
+                structlog.get_logger().info("indexed_completed_ticket_into_rag", ticket_id=ticket_id)
+            except Exception as e:
+                import structlog
+                structlog.get_logger().warning("failed_to_index_completed_ticket_into_rag", ticket_id=ticket_id, error=str(e))
+
         # ── HITL or Complete ──────────────────────────────────────────────
         if isinstance(result, dict) and result.get("hitl_required"):
             result_data = {**result, "hitl_reason": result.get("hitl_reason")}
