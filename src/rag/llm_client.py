@@ -42,10 +42,10 @@ logger = logging.getLogger(__name__)
 LOCAL_MODEL = os.environ.get("LLM_DEFAULT_LOCAL", "ollama/gemma3:4b")
 CLOUD_MODEL = os.environ.get(
     "LLM_DEFAULT_CLOUD",
-    # Verified working free OpenRouter models (benchmarked 2026-05-22):
-    #   openrouter/meta-llama/llama-3.1-8b-instruct  — 1.1s, excellent quality
-    #   openrouter/qwen/qwen3-8b                     — 5.3s, great reasoning
-    "openrouter/meta-llama/llama-3.1-8b-instruct"
+    # Verified working free/low-cost OpenRouter models (benchmarked 2026-05-22):
+    #   openrouter/google/gemini-2.5-flash           — 0.5s, superb speed, excellent quality
+    #   openrouter/meta-llama/llama-3.1-8b-instruct  — 7.0s, excellent quality
+    "openrouter/google/gemini-2.5-flash"
 )
 OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
 OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
@@ -78,6 +78,7 @@ _COST_PER_1K_INPUT = {
     "openrouter/mistralai/mistral-7b-instruct:free": 0.0,
     "openrouter/microsoft/phi-3-mini-128k-instruct:free": 0.0,
     # OpenRouter PAID models (for when budget allows)
+    "openrouter/google/gemini-2.5-flash": 0.000075,
     "openrouter/anthropic/claude-3.5-sonnet": 0.003,
     "openrouter/openai/gpt-4o": 0.005,
     "openrouter/google/gemini-1.5-pro": 0.00125,
@@ -92,6 +93,7 @@ _COST_PER_1K_OUTPUT = {
     "openrouter/mistralai/mistral-7b-instruct:free": 0.0,
     "openrouter/microsoft/phi-3-mini-128k-instruct:free": 0.0,
     # OpenRouter PAID models
+    "openrouter/google/gemini-2.5-flash": 0.0003,
     "openrouter/anthropic/claude-3.5-sonnet": 0.015,
     "openrouter/openai/gpt-4o": 0.015,
     "openrouter/google/gemini-1.5-pro": 0.005,
