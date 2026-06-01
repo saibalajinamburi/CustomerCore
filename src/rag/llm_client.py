@@ -157,14 +157,19 @@ class LLMClient:
 
         # Dynamic fallback to fast cloud model in cloud/production environments
         is_cloud = os.environ.get("APP_ENV") == "production" or "SPACE_ID" in os.environ
-        if provider == "local" and is_cloud:
+        if provider == "local" and is_cloud and not model.startswith("huggingface/"):
             logger.info("Ollama not available in cloud environment. Dynamically falling back to fast cloud model: %s", self.fast_cloud_model)
             provider = "cloud"
             model = self.fast_cloud_model
 
-        # Configure Ollama base URL for local calls
-        api_base = OLLAMA_BASE_URL if provider == "local" else None
-        api_key = OPENROUTER_API_KEY if provider == "cloud" else None
+        # Configure API base and keys based on model provider
+        if model.startswith("huggingface/"):
+            provider = "cloud"
+            api_base = None
+            api_key = os.environ.get("HF_TOKEN") or os.environ.get("HUGGINGFACE_API_KEY", "")
+        else:
+            api_base = OLLAMA_BASE_URL if provider == "local" else None
+            api_key = OPENROUTER_API_KEY if provider == "cloud" else None
 
         t0 = time.perf_counter()
         try:
