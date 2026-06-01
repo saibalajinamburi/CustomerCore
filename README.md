@@ -151,8 +151,10 @@ graph TD
 | Model | Algorithm | Task | Tracked on |
 |:------|:----------|:-----|:-----------|
 | **Churn Classifier** | Random Forest, Logistic Regression, Gradient Boosting | Predict customer churn probability from account features | [DagsHub MLflow](https://dagshub.com/saibalajinamburi/CustomerCore.mlflow) |
+| **Support LLM (QLoRA)** | Llama 3 8B Instruct (PEFT / QLoRA) | Predict professional, tenant-specific ticket resolutions | Hugging Face Adapter Registry |
 
-The training pipeline (`src/ml/train_churn.py`) trains all 3 models, compares F1 scores, and **auto-promotes the best one to "Production"** in the DagsHub Model Registry. Logged artifacts include ROC curves, confusion matrices, and feature importance plots.
+* **Churn Classifier**: The training pipeline (`src/ml/train_churn.py`) trains all 3 models, compares F1 scores, and **auto-promotes the best one to "Production"** in the DagsHub Model Registry. Logged artifacts include ROC curves, confusion matrices, and feature importance plots.
+* **Support LLM (QLoRA)**: The serverless training pipeline (`src/ml/modal_train.py`) executes on-demand on an Nvidia A10G GPU using **Modal**, pulls historical resolved support tickets (`raw_text` and `suggested_resolution`) from Supabase, performs QLoRA fine-tuning in 4-bit NF4 double-quantization, and publishes the resulting LoRA adapter (`customercore-llama3-adapter`) to the Hugging Face Hub.
 
 ### Models We Call via API (LLM)
 
@@ -681,6 +683,11 @@ doppler run -- python -X utf8 src/ml/train_churn.py
 pytest tests/ -v
 ```
 
+### 9. (Optional) Run Serverless GPU LLM Fine-Tuning
+```bash
+doppler run -- modal run src/ml/modal_train.py
+```
+
 ---
 
 ## ⚠️ Challenges Faced & How We Solved Them
@@ -699,6 +706,9 @@ pytest tests/ -v
 | **Ollama unavailable in cloud containers** | HF Spaces don't ship with Ollama — local model calls time out after several seconds | `LLMClient` detects `SPACE_ID` / `APP_ENV=production` at startup and transparently redirects local tier calls to `openrouter/google/gemini-2.5-flash` |
 | **Stale HITL data persists after role switch** | Switching from `manager` to `support_agent` in the demo left previously fetched review rows visible | Added an immediate role guard in `generateToken()` that clears the HITL table and shows an "Access Denied" banner the instant the role changes to `support_agent` |
 | **Misleading DB timeout error messages** | When Supabase was unreachable, the UI catch block printed "Ensure role is manager" — wrong root cause | Updated catch blocks to distinguish `NetworkError` / `ENOTFOUND` from auth errors and display an accurate "Database unreachable" message with guidance |
+| **Gated base model downloads on HF** | Hugging Face gated models (like `meta-llama/Meta-Llama-3-8B-Instruct`) returned a `403 Forbidden` error on serverless containers without user authorization | Switched base model to `NousResearch/Meta-Llama-3-8B-Instruct`, a public non-gated clone with identical architecture and weights |
+| **Missing dependency in Python 3.12 container** | The remote training process crashed with `ModuleNotFoundError: No module named 'setuptools'` | Added `setuptools` to the container `pip_install` settings in `modal_train.py` for Python 3.12 compatibility |
+| **Schema mapping & status issues in training script** | Direct queries failed due to non-existent columns (`text`) and incorrect status mapping (`completed` vs check constraints) | Replaced the column selection with `raw_text` and changed the status filter criteria to `'complete'` |
 
 ---
 

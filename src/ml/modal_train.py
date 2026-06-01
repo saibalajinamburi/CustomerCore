@@ -18,6 +18,7 @@ image = (
     modal.Image.debian_slim()
     .apt_install("git")
     .pip_install(
+        "setuptools",
         "numpy<2",
         "torch==2.2.0",
         "transformers==4.38.1",
@@ -25,8 +26,7 @@ image = (
         "bitsandbytes==0.42.0",
         "accelerate==0.27.2",
         "datasets==2.17.1",
-        "supabase==2.9.0",
-        "gotrue==2.8.1",
+        "supabase==2.30.0",
     )
 )
 
@@ -75,8 +75,8 @@ def train_llm():
     # Fetch completed triage tickets to use as training ground-truth
     response = (
         supabase.table("tickets")
-        .select("text, suggested_resolution")
-        .eq("status", "completed")
+        .select("raw_text, suggested_resolution")
+        .eq("status", "complete")
         .limit(1000) # Limit for demonstration, can be raised to fetch full dataset
         .execute()
     )
@@ -92,7 +92,7 @@ def train_llm():
     # Standard prompt template matching Llama 3 style
     def format_prompt(row):
         system_prompt = "You are a CustomerCore B2B support agent. Respond to the support ticket professionally."
-        user_input = row["text"]
+        user_input = row["raw_text"]
         response = row["suggested_resolution"]
         
         prompt = (
@@ -107,7 +107,7 @@ def train_llm():
     print("🧹 Data formatted into instruction training prompt template.")
 
     # 3. Configure 4-bit quantization (QLoRA)
-    base_model_name = "meta-llama/Meta-Llama-3-8B-Instruct"
+    base_model_name = "NousResearch/Meta-Llama-3-8B-Instruct"
     print(f"📥 Loading base model on GPU: {base_model_name}")
     
     bnb_config = BitsAndBytesConfig(
