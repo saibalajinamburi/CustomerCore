@@ -18,13 +18,15 @@ image = (
     modal.Image.debian_slim()
     .apt_install("git")
     .pip_install(
+        "numpy<2",
         "torch==2.2.0",
         "transformers==4.38.1",
         "peft==0.8.2",
         "bitsandbytes==0.42.0",
         "accelerate==0.27.2",
         "datasets==2.17.1",
-        "supabase==2.3.0",
+        "supabase==2.9.0",
+        "gotrue==2.8.1",
     )
 )
 
