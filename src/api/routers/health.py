@@ -203,3 +203,45 @@ async def trigger_migrations() -> JSONResponse:
                 "db_url_redacted": redacted_db_url
             }
         )
+
+@router.get("/keep-alive", summary="Keep-alive ping for Supabase and HF Spaces")
+async def keep_alive() -> JSONResponse:
+    """
+    Lightweight endpoint to keep the database awake on the free tier.
+    This executes a fast query on Supabase.
+    """
+    import os
+    import httpx
+
+    supabase_url = os.getenv("SUPABASE_URL")
+    supabase_key = os.getenv("SUPABASE_KEY")
+
+    if not supabase_url or not supabase_key:
+        return JSONResponse(
+            status_code=500,
+            content={"status": "error", "message": "Supabase credentials not configured."}
+        )
+
+    try:
+        headers = {
+            "apikey": supabase_key,
+            "Authorization": f"Bearer {supabase_key}"
+        }
+        # Requesting a limit=1 from tickets table is very fast and counts as activity
+        resp = httpx.get(f"{supabase_url}/rest/v1/tickets?select=id&limit=1", headers=headers, timeout=5.0)
+        
+        if resp.status_code >= 400:
+            return JSONResponse(
+                status_code=500,
+                content={"status": "error", "message": f"Supabase responded with {resp.status_code}"}
+            )
+
+        return JSONResponse(
+            status_code=200,
+            content={"status": "success", "message": "Keep-alive ping successful"}
+        )
+    except Exception as exc:
+        return JSONResponse(
+            status_code=500,
+            content={"status": "error", "message": str(exc)}
+        )

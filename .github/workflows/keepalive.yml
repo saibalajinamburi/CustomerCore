@@ -1,0 +1,26 @@
+name: Keep-Alive Ping
+
+on:
+  schedule:
+    # Run at 12:00 PM (UTC) every day
+    - cron: '0 12 * * *'
+  workflow_dispatch:  # Allow manual triggers from GitHub Actions UI
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Hit the Keep-Alive endpoint
+        run: |
+          # Send a GET request to the HF Space keep-alive endpoint
+          # Replace the URL below with the actual Hugging Face Space URL if different
+          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" https://customercore.hf.space/api/v1/keep-alive)
+          echo "Endpoint responded with HTTP code: $RESPONSE"
+          
+          if [ "$RESPONSE" -eq 200 ]; then
+            echo "Keep-alive ping successful!"
+            exit 0
+          else
+            echo "Failed to ping the keep-alive endpoint. HTTP code: $RESPONSE"
+            exit 1
+          fi
