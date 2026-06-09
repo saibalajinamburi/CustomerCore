@@ -13,8 +13,7 @@ jobs:
       - name: Hit the Keep-Alive endpoint
         run: |
           # Send a GET request to the HF Space keep-alive endpoint
-          # Replace the URL below with the actual Hugging Face Space URL if different
-          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" https://customercore.hf.space/api/v1/keep-alive)
+          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" https://saibalajiomg-customercore.hf.space/api/v1/keep-alive)
           echo "Endpoint responded with HTTP code: $RESPONSE"
           
           if [ "$RESPONSE" -eq 200 ]; then
