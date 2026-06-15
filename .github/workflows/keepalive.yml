@@ -6,20 +6,43 @@ on:
     - cron: '0 12 * * *'
   workflow_dispatch:  # Allow manual triggers from GitHub Actions UI
 
+permissions:
+  contents: write
+
 jobs:
   ping:
     runs-on: ubuntu-latest
     steps:
-      - name: Hit the Keep-Alive endpoint
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Ping CustomerCore
         run: |
-          # Send a GET request to the HF Space keep-alive endpoint
+          # Send a GET request to the HF Space keep-alive endpoint (which also keeps Supabase awake)
           RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" https://saibalajiomg-customercore.hf.space/api/v1/keep-alive)
-          echo "Endpoint responded with HTTP code: $RESPONSE"
-          
-          if [ "$RESPONSE" -eq 200 ]; then
-            echo "Keep-alive ping successful!"
-            exit 0
-          else
-            echo "Failed to ping the keep-alive endpoint. HTTP code: $RESPONSE"
-            exit 1
+          echo "CustomerCore keep-alive endpoint responded with HTTP code: $RESPONSE"
+
+      - name: Ping SupportPulse
+        run: |
+          # Send a GET request to the SupportPulse Space URL
+          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" https://saibalajiomg-supportpulse.hf.space/)
+          echo "SupportPulse endpoint responded with HTTP code: $RESPONSE"
+
+      - name: Ping ResearchIQ
+        run: |
+          # Send a GET request to the ResearchIQ Space URL
+          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" https://saibalajiomg-researchiq.hf.space/)
+          echo "ResearchIQ endpoint responded with HTTP code: $RESPONSE"
+
+      - name: Prevent GitHub Workflow Suspension
+        run: |
+          # On Sundays (day 7), write a timestamp to keepalive_ping.txt and commit it.
+          # This repository activity resets GitHub's 60-day cron suspension timer.
+          if [ "$(date +%u)" -eq 7 ]; then
+            echo "Keep-alive tick: $(date -u)" > keepalive_ping.txt
+            git config --local user.email "action@github.com"
+            git config --local user.name "GitHub Action"
+            git add keepalive_ping.txt
+            git commit -m "chore: weekly keep-alive tick to prevent workflow suspension [skip ci]" || exit 0
+            git push
           fi
