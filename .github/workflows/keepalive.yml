@@ -2,8 +2,8 @@ name: Keep-Alive Ping
 
 on:
   schedule:
-    # Run at 12:00 PM (UTC) every day
-    - cron: '0 12 * * *'
+    # Run every 12 hours to ensure spaces never hit the 48-hour inactivity limit
+    - cron: '0 6,18 * * *'
   workflow_dispatch:  # Allow manual triggers from GitHub Actions UI
 
 permissions:
@@ -16,23 +16,53 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Restart Sleeping Spaces via HF API
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          SPACES=("saibalajiomg/customercore" "saibalajiomg/SupportPulse" "saibalajiomg/researchiq")
+          for SPACE in "${SPACES[@]}"; do
+            echo "--- Checking $SPACE ---"
+            # Get the current runtime status
+            STATUS=$(curl -s -H "Authorization: Bearer $HF_TOKEN" \
+              "https://huggingface.co/api/spaces/$SPACE" | python3 -c "
+          import sys, json
+          try:
+              data = json.load(sys.stdin)
+              stage = data.get('runtime', {}).get('stage', 'UNKNOWN')
+              print(stage)
+          except:
+              print('UNKNOWN')
+          ")
+            echo "  Current status: $STATUS"
+
+            if [ "$STATUS" != "RUNNING" ]; then
+              echo "  Space is not running ($STATUS). Restarting..."
+              curl -s -X POST \
+                -H "Authorization: Bearer $HF_TOKEN" \
+                "https://huggingface.co/api/spaces/$SPACE/restart"
+              echo "  Restart request sent."
+              # Wait for it to boot up
+              sleep 30
+            else
+              echo "  Space is running."
+            fi
+          done
+
       - name: Ping CustomerCore
         run: |
-          # Send a GET request to the HF Space keep-alive endpoint (which also keeps Supabase awake)
-          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" https://saibalajiomg-customercore.hf.space/api/v1/keep-alive)
-          echo "CustomerCore keep-alive endpoint responded with HTTP code: $RESPONSE"
+          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 https://saibalajiomg-customercore.hf.space/api/v1/keep-alive)
+          echo "CustomerCore responded with HTTP code: $RESPONSE"
 
       - name: Ping SupportPulse
         run: |
-          # Send a GET request to the SupportPulse Space URL
-          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" https://saibalajiomg-supportpulse.hf.space/)
-          echo "SupportPulse endpoint responded with HTTP code: $RESPONSE"
+          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 https://saibalajiomg-supportpulse.hf.space/)
+          echo "SupportPulse responded with HTTP code: $RESPONSE"
 
       - name: Ping ResearchIQ
         run: |
-          # Send a GET request to the ResearchIQ Space URL
-          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" https://saibalajiomg-researchiq.hf.space/)
-          echo "ResearchIQ endpoint responded with HTTP code: $RESPONSE"
+          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 https://saibalajiomg-researchiq.hf.space/)
+          echo "ResearchIQ responded with HTTP code: $RESPONSE"
 
       - name: Prevent GitHub Workflow Suspension
         run: |
