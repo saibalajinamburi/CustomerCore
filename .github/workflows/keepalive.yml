@@ -20,10 +20,14 @@ jobs:
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
+          if [ -z "$HF_TOKEN" ]; then
+            echo "WARNING: HF_TOKEN secret not set - skipping restart check"
+            exit 0
+          fi
+
           SPACES=("saibalajiomg/customercore" "saibalajiomg/SupportPulse" "saibalajiomg/researchiq")
           for SPACE in "${SPACES[@]}"; do
             echo "--- Checking $SPACE ---"
-            # Get the current runtime status
             STATUS=$(curl -s -H "Authorization: Bearer $HF_TOKEN" \
               "https://huggingface.co/api/spaces/$SPACE" | python3 -c "
           import sys, json
@@ -41,27 +45,26 @@ jobs:
               curl -s -X POST \
                 -H "Authorization: Bearer $HF_TOKEN" \
                 "https://huggingface.co/api/spaces/$SPACE/restart"
-              echo "  Restart request sent."
-              # Wait for it to boot up
+              echo "  Restart request sent. Waiting 30s for boot..."
               sleep 30
             else
-              echo "  Space is running."
+              echo "  Space is running - OK"
             fi
           done
 
       - name: Ping CustomerCore
         run: |
-          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 https://saibalajiomg-customercore.hf.space/api/v1/keep-alive)
+          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 60 https://saibalajiomg-customercore.hf.space/api/v1/keep-alive)
           echo "CustomerCore responded with HTTP code: $RESPONSE"
 
       - name: Ping SupportPulse
         run: |
-          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 https://saibalajiomg-supportpulse.hf.space/)
+          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 60 https://saibalajiomg-supportpulse.hf.space/)
           echo "SupportPulse responded with HTTP code: $RESPONSE"
 
       - name: Ping ResearchIQ
         run: |
-          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 https://saibalajiomg-researchiq.hf.space/)
+          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 60 https://saibalajiomg-researchiq.hf.space/)
           echo "ResearchIQ responded with HTTP code: $RESPONSE"
 
       - name: Prevent GitHub Workflow Suspension
